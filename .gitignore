@@ -14,6 +14,8 @@ DerivedData/
 
 # Build
 build/
+.build/
+DerivedData/
 
 # Swift Package Manager
 .build/
@@ -44,7 +46,9 @@ Icon
 # *.a and *.xcframework tracked in .gitattributes
 
 # Sensitive / local
-*.env
+.env
+.env.*
+!.env.example
 *.pem
 
 # Omx
