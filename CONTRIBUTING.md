@@ -2,7 +2,7 @@
 
 Report problems in [GitHub Issues](https://github.com/pedrotmr/git-bar/issues). Include macOS version, Git version, steps to reproduce, and sanitized error text. Remove private paths, repository names, and personal data before sharing logs or screenshots.
 
-Install Xcode 27.1 or newer with the macOS platform. Git is required to build and for the app's repository features. GitHub CLI is optional for pull requests. Homebrew is optional. Run `make setup` to resolve the pinned Sparkle 2.10.1 dependency.
+Install Xcode 26.6 or newer with the macOS platform. Git is required to build and for the app's repository features. GitHub CLI is optional for pull requests. Homebrew is optional. Run `make setup` to resolve the pinned Sparkle 2.10.1 dependency.
 
 Run the commands used by CI:
 

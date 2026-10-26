@@ -15,6 +15,7 @@ GENERATE_INFOPLIST_FILE = NO
 APP_COPYRIGHT = Copyright © 2026 pedrotmr
 RELEASE_OWNER = pedrotmr
 RELEASE_SLUG = git-bar
+SPARKLE_ENABLED = YES
 SPARKLE_FEED_URL = https:/$()/github.com/$(RELEASE_OWNER)/$(RELEASE_SLUG)/releases/latest/download/appcast.xml
 SPARKLE_PUBLIC_ED_KEY = VUDvwV3+DXWYMPSVLvJ0IKCI7SllKT8MwDGDc7h8ytc=
 
