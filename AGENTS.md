@@ -15,7 +15,7 @@ GitBar is a macOS menu bar app for local Git branches, worktrees, stashes, and G
 
 ## Build and verification
 
-Use Xcode 27.1 or newer and the Makefile interface. Xcode is the only app build system; Swift Package Manager is used by Xcode to resolve the pinned Sparkle dependency.
+Use Xcode 26.6 or newer and the Makefile interface. Xcode is the only app build system; Swift Package Manager is used by Xcode to resolve the pinned Sparkle dependency.
 
 ```sh
 make setup

@@ -3,7 +3,7 @@
 ## Toolchain
 
 - macOS 14.6 or later to run GitBar.
-- Xcode 27.1 or newer with the macOS platform. The current project uses Xcode's build system and its bundled Swift 6.4 toolchain in Swift 5 language mode.
+- Xcode 26.6 or newer with the macOS platform. The current project uses Xcode's build system and its bundled Swift toolchain in Swift 5 language mode.
 - Git for source work and repository operations.
 - GitHub CLI (`gh`) is optional at runtime and required only for the pull request view. Install it with Homebrew and authenticate using `gh auth login`.
 - Homebrew is optional for development and distribution.
@@ -60,7 +60,7 @@ The current v0.1.2 build predates Sparkle and is not notarized. It cannot self-u
 
 ## Troubleshooting
 
-- `make setup` reports an old Xcode: install Xcode 27.1 or newer and select it with `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
+- `make setup` reports an old Xcode: install Xcode 26.6 or newer and select it with `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
 - Xcode cannot resolve Sparkle: check network access to GitHub, then rerun `make setup`.
 - GitBar cannot find Git or `gh` from Finder: the app adds standard Homebrew, user, and system executable locations. Reinstall the missing tool into one of those paths; a shell-only PATH change is not inherited by Finder.
 - The PR view is empty: confirm the selected repository has a GitHub `origin`, install `gh`, run `gh auth login`, and check account access with `gh auth status`. When `gh` is absent, GitBar shows an install hint. When unauthenticated, GitHub CLI's error is displayed and other local Git tabs continue to work.
