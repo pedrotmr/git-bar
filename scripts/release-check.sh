@@ -114,8 +114,8 @@ for binary in "$app_path/Contents/MacOS/$APP_NAME" \
   "$sparkle_version/Sparkle" \
   "$sparkle_version/Autoupdate" \
   "$sparkle_version/Updater.app/Contents/MacOS/Updater"; do
-  lipo -verify_arch arm64 "$binary" || fail "${binary##*/} is missing arm64."
-  lipo -verify_arch x86_64 "$binary" || fail "${binary##*/} is missing x86_64."
+  lipo "$binary" -verify_arch arm64 || fail "${binary##*/} is missing arm64."
+  lipo "$binary" -verify_arch x86_64 || fail "${binary##*/} is missing x86_64."
 done
 
 dmg_path="$release_dir/$APP_NAME-$APP_VERSION.dmg"
