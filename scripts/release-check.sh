@@ -41,6 +41,9 @@ done
 for name in APPLE_NOTARY_KEY_P8_BASE64 APPLE_NOTARY_KEY_ID APPLE_NOTARY_ISSUER_ID; do
   require_value "$name"
 done
+if [[ "${CI:-}" == true ]]; then
+  require_value SPARKLE_PRIVATE_KEY
+fi
 
 [[ "$APP_BUILD_NUMBER" =~ ^[0-9]+$ ]] || fail "APP_BUILD_NUMBER must be a positive integer."
 (( APP_BUILD_NUMBER > 0 )) || fail "APP_BUILD_NUMBER must be a positive integer."
