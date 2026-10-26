@@ -57,17 +57,6 @@ Add these two items under **Variables**:
 - `APPLE_NOTARY_KEY_ID`
 - `APPLE_NOTARY_ISSUER_ID`
 
-The local `.env` file has the Developer ID export, its password, a Base64 copy of the local `.p8` file, and GitBar's Sparkle key. The two Apple IDs are empty.
-
-GitHub currently has only the `SPARKLE_PRIVATE_KEY` name. Its value is hidden. Replace it with this `.env` value. GitHub has no Apple secrets or variables. Add the three Apple secrets and two Apple variables after you confirm that the `.p8` file is a Team key. The local Developer ID certificate is valid for this team.
-
-Check names without reading values:
-
-```sh
-gh secret list --repo pedrotmr/git-bar
-gh variable list --repo pedrotmr/git-bar
-```
-
 ## Keep the files safe
 
 `.env` is plain text. It is ignored by Git and has file permission `600`. Keep it on this Mac and keep a separate encrypted backup of the original `.p12`, `.p8`, passwords, and private keys. Base64 does not protect a secret.
@@ -76,10 +65,15 @@ The Apple values are shared between both app repositories. The Sparkle private k
 
 `GITHUB_TOKEN` is supplied by GitHub Actions. Do not add it. `CODESIGN_IDENTITY` is optional for local work. It is not a GitHub setting.
 
-## Check the setup
+## Check the settings
 
-`make check` does not need release credentials. `make release-check APP_BUILD_NUMBER=<new-number>` checks a signed distribution and sends the app to Apple for notarization. It makes local files only; it does not publish a release.
+Before a signed check, confirm that all six values are set in `.env`. The Key ID must belong to the `.p8` file. If both apps use the same Team API key, use the same Key ID and Issuer ID in both repositories.
 
-After this PR is merged, the CI workflow can run with `signed_distribution=true`. It checks credentials and saves a short-lived artifact. It does not create a release.
+`make check` does not need release credentials. `make release-check APP_BUILD_NUMBER=<new-number>` signs a test build and sends it to Apple for notarization. It checks the Sparkle feed and does not publish a release.
 
-Checked on 26 October 2026. GitHub secret values are hidden, so only the setting names can be checked there.
+Check setting names without viewing secret values:
+
+```sh
+gh secret list --repo pedrotmr/git-bar
+gh variable list --repo pedrotmr/git-bar
+```
