@@ -19,7 +19,7 @@ Homebrew manages updates for this copy. To update only this cask, run:
 
 ```sh
 brew update
-brew upgrade --cask pedrotmr/git-bar/pedrotmr-git-bar
+brew upgrade --cask --greedy-auto-updates pedrotmr/git-bar/pedrotmr-git-bar
 ```
 
 Direct downloads use Sparkle. Do not use the Homebrew command to update a direct download.

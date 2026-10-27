@@ -20,12 +20,12 @@ Homebrew manages updates for this copy. To update only GitBar, run:
 
 ```sh
 brew update
-brew upgrade --cask pedrotmr/git-bar/pedrotmr-git-bar
+brew upgrade --cask --greedy-auto-updates pedrotmr/git-bar/pedrotmr-git-bar
 ```
 
 ### Direct download
 
-Download the latest stable `GitBar-<version>.dmg` from [GitHub Releases](https://github.com/pedrotmr/git-bar/releases/latest). Open the disk image and drag `GitBar.app` to Applications.
+Download the latest stable `GitBar-<version>.dmg` or `.zip` from [GitHub Releases](https://github.com/pedrotmr/git-bar/releases/latest). Open the disk image and drag `GitBar.app` to Applications, or expand the ZIP and move the app to Applications.
 
 Direct installs can use **Check for Updates…** in the app. Version 0.2.0 is the first Sparkle release. For a predictable upgrade from v0.1.x, install the current release manually once.
 
