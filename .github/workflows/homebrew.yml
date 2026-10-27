@@ -92,7 +92,7 @@ jobs:
             --bundle-id "$APP_BUNDLE_ID" \
             --app-name "$APP_NAME" \
             --app-display-name "GitBar" \
-            --description "Manage Git branches, worktrees, stashes, and pull requests." \
+            --description "Manage Git branches, worktrees, stashes, and pull requests" \
             --min-macos "$APP_MIN_SYSTEM_VERSION" \
             --sparkle "yes"
           cd tap
