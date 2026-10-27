@@ -10,6 +10,27 @@ SCRIPT = ROOT / "scripts" / "update-cask.py"
 
 
 class UpdateCaskTests(unittest.TestCase):
+    def test_minor_version_preflight_rejects_older_macos(self):
+        for current_version, accepted in (("14.5", False), ("14.6", True), ("15.0", True)):
+            with self.subTest(current_version=current_version):
+                result = subprocess.run(
+                    [
+                        "/usr/bin/osascript",
+                        "-e",
+                        f'set osVersion to "{current_version}"',
+                        "-e",
+                        "considering numeric strings",
+                        "-e",
+                        'if osVersion < "14.6" then error "Requires macOS 14.6 or later." number 1',
+                        "-e",
+                        "end considering",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode == 0, accepted, result.stderr)
+
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.tap_dir = Path(self.temp_dir.name) / "tap"
@@ -42,7 +63,7 @@ class UpdateCaskTests(unittest.TestCase):
                 "--app-display-name",
                 "Demo",
                 "--description",
-                "A demo app.",
+                "Manage demo workspaces...",
                 "--min-macos",
                 "14.6",
                 "--sparkle",
@@ -63,7 +84,10 @@ class UpdateCaskTests(unittest.TestCase):
         self.assertIn(f'sha256 "{checksum}"', content)
         self.assertIn("auto_updates true", content)
         self.assertIn("depends_on macos: :sonoma", content)
-        self.assertIn('desc "A demo app"', content)
+        self.assertIn('desc "Manage demo workspaces"', content)
+        self.assertNotIn("verified:", content)
+        self.assertIn("preflight_steps do", content)
+        self.assertIn('if osVersion < \\"14.6\\" then error', content)
         self.assertIn('"managedByHomebrewBundlePath",\n          "-string",\n          "{{appdir}}/Demo.app"', content)
         self.assertNotIn("#{appdir}", content)
         self.assertIn(
