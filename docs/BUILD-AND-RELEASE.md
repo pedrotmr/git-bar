@@ -55,13 +55,20 @@ GitHub gates signing jobs with the `signed-distribution` environment. Its deploy
 
 ## Updating and Homebrew
 
-Users who install a direct download use Sparkle's **Check for Updates…** command. Users who install through Homebrew use `brew update && brew upgrade`. The cask marks Sparkle-enabled builds as `auto_updates true` and writes its version and app path to a separate UserDefaults domain. GitBar disables Sparkle only when both values match the running app. This lets a separate direct copy use Sparkle even when a Homebrew copy is also installed. The cask clears these update markers when it uninstalls the app; it does not touch repository data or app preferences.
+Direct downloads use Sparkle's **Check for Updates…** command. To update only the Homebrew copy, run:
+
+```sh
+brew update
+brew upgrade --cask --greedy-auto-updates pedrotmr/git-bar/pedrotmr-git-bar
+```
+
+The cask marks the app as Homebrew-managed. It stores the app version and path in a separate UserDefaults domain. GitBar disables Sparkle only when the running app matches both values. The cask removes these markers when it uninstalls the app. It does not remove GitBar settings or repository data.
 
 To switch the same app copy from Homebrew to a direct download, run `brew uninstall --cask pedrotmr-git-bar` first, then install the downloaded app. Homebrew owns the app path while its cask is installed.
 
-Homebrew skips a readable self-updating app during a normal `brew upgrade` when the installed app is the same version as or newer than the cask. Naming the cask or using greedy upgrade options can include it and reinstall an older version. Use `brew update && brew upgrade`. See [Homebrew's updater guidance](https://docs.brew.sh/FAQ#how-does-brew-upgrade-handle-apps-that-update-themselves). The new tap and cask are not available yet because there is no signed public release to reference. After a stable release is published, the app workflow checks the ZIP, calculates its SHA-256, audits the cask, and pushes it to the tap. It needs `HOMEBREW_TAP_TOKEN` with write access to that tap.
+Homebrew compares the installed app version with the versioned cask when it can read the app bundle. It skips the cask when the installed app appears to be the same version or newer. See [Homebrew's FAQ](https://docs.brew.sh/FAQ#how-does-brew-upgrade-handle-apps-that-update-themselves). The tap has a cask for the latest stable release. After each stable release, the workflow checks the ZIP, calculates its SHA-256, audits the cask, and updates the tap. It needs `HOMEBREW_TAP_TOKEN` with write access to that tap.
 
-The current v0.1.2 build predates Sparkle and is not notarized. It cannot self-update with Sparkle. Its custom GitHub updater may bridge existing installations to the first signed versioned ZIP, but that transition has not been exercised. Until the first signed release is published, there is no supported new-install path.
+Version v0.1.2 predates Sparkle. Install the current stable release manually once to move to Sparkle updates. The older custom updater has not been tested with the signed release, so do not rely on it for this migration.
 
 ## Troubleshooting
 

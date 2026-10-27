@@ -30,7 +30,7 @@ final class UpdateService {
         if managedByHomebrew {
             let alert = NSAlert()
             alert.messageText = "Updates are managed by Homebrew"
-            alert.informativeText = "Run `brew update && brew upgrade` to update GitBar."
+        alert.informativeText = "Run `brew update`, then `brew upgrade --cask --greedy-auto-updates pedrotmr/git-bar/pedrotmr-git-bar` to update GitBar."
             alert.addButton(withTitle: "OK")
             alert.runModal()
             return
