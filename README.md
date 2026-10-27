@@ -9,11 +9,10 @@
   </p>
 </div>
 
-## GitBar in action
+<div align="center">
+  https://github.com/user-attachments/assets/d994314c-2078-431e-af76-e55b3794d2a4
+</div>
 
-<video src="Media/git-bar-demo.mp4" controls width="640" aria-label="GitBar demo"></video>
-
-[Watch or download the GitBar demo](Media/git-bar-demo.mp4).
 
 ## ✨ Features
 
