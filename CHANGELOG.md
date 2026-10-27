@@ -2,6 +2,14 @@
 
 Releases are versioned with SemVer. Release notes for the next version are prepared in the release pull request.
 
+## [0.2.1](https://github.com/pedrotmr/git-bar/compare/v0.2.0...v0.2.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* generate Homebrew-compatible casks ([#6](https://github.com/pedrotmr/git-bar/issues/6)) ([5abb16b](https://github.com/pedrotmr/git-bar/commit/5abb16bba5fad83b4022a73863f0ae83b878b5c0))
+* **homebrew:** show targeted update command ([#9](https://github.com/pedrotmr/git-bar/issues/9)) ([7bea708](https://github.com/pedrotmr/git-bar/commit/7bea708e28d529f7f64a27325ddd806a5634fa78))
+
 ## [0.2.0](https://github.com/pedrotmr/git-bar/compare/v0.1.2...v0.2.0) (2026-10-27)
 
 
