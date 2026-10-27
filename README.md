@@ -9,9 +9,11 @@
   </p>
 </div>
 
-![Screenshot placeholder for GitBar](Screenshots/git-bar-placeholder.svg)
+## GitBar in action
 
-_This is a placeholder, not an app screenshot. See the [capture instructions](docs/SCREENSHOT.md)._
+<video src="Media/git-bar-demo.mp4" controls width="640" aria-label="GitBar demo"></video>
+
+[Watch or download the GitBar demo](Media/git-bar-demo.mp4).
 
 ## ✨ Features
 
