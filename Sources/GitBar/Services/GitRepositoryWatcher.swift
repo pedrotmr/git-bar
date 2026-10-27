@@ -1,22 +1,25 @@
 import Foundation
 
-final class GitRepositoryWatcher {
-    let onChange: () -> Void
+nonisolated final class GitRepositoryWatcher: @unchecked Sendable {
+    let onChange: @Sendable () -> Void
     private var sources: [DispatchSourceFileSystemObject] = []
     private var debounceWorkItem: DispatchWorkItem?
     private let debounceInterval: TimeInterval = 0.5
     private let queue = DispatchQueue(label: "com.gitbar.repository-watcher")
+    private let queueKey = DispatchSpecificKey<Bool>()
 
-    init(onChange: @escaping () -> Void) {
+    init(onChange: @escaping @Sendable () -> Void) {
         self.onChange = onChange
+        queue.setSpecific(key: queueKey, value: true)
     }
 
     func start(repoPath: String) {
-        queue.sync { self._stop() }
-        let gitURL = URL(fileURLWithPath: repoPath).appendingPathComponent(".git")
-        let subpaths = ["", "HEAD", "refs", "refs/heads", "refs/stash", "refs/tags", "worktrees"]
-        let pathsToWatch = subpaths.map { gitURL.appendingPathComponent($0).path }
-        queue.sync {
+        queue.async { [weak self] in
+            guard let self else { return }
+            self._stop()
+            let gitURL = URL(fileURLWithPath: repoPath).appendingPathComponent(".git")
+            let subpaths = ["", "HEAD", "refs", "refs/heads", "refs/stash", "refs/tags", "worktrees"]
+            let pathsToWatch = subpaths.map { gitURL.appendingPathComponent($0).path }
             for path in pathsToWatch {
                 guard FileManager.default.fileExists(atPath: path) else { continue }
                 let fd = open(path, O_EVTONLY)
@@ -35,7 +38,11 @@ final class GitRepositoryWatcher {
     }
 
     func stop() {
-        queue.sync { _stop() }
+        if DispatchQueue.getSpecific(key: queueKey) == true {
+            _stop()
+        } else {
+            queue.sync { _stop() }
+        }
     }
 
     private func _stop() {
