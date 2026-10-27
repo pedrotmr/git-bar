@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560" role="img" aria-labelledby="title desc">
-  <title id="title">Screenshot placeholder</title>
-  <desc id="desc">A placeholder that must be replaced with a real GitBar screenshot.</desc>
-  <rect width="900" height="560" fill="#f4f4f6"/>
-  <rect x="24" y="24" width="852" height="512" rx="20" fill="#fff" stroke="#b8bac2" stroke-width="2" stroke-dasharray="10 8"/>
-  <text x="450" y="260" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="30" fill="#333">Real app screenshot pending</text>
-  <text x="450" y="310" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="19" fill="#666">Replace this file with a capture using fictional local Git data.</text>
-</svg>
