@@ -16,7 +16,12 @@ A macOS menu bar app for managing Git branches, worktrees, stashes, and GitHub p
 brew install --cask pedrotmr/git-bar/pedrotmr-git-bar
 ```
 
-Homebrew installs and updates this copy. Update it with `brew update && brew upgrade`.
+Homebrew manages updates for this copy. To update only GitBar, run:
+
+```sh
+brew update
+brew upgrade --cask pedrotmr/git-bar/pedrotmr-git-bar
+```
 
 ### Direct download
 
@@ -28,7 +33,7 @@ Direct installs can use **Check for Updates…** in the app. Version 0.2.0 is th
 
 Open GitBar from Applications and add a local Git repository. GitBar reads its local branches, worktrees, and stashes. The pull request view uses GitHub CLI (`gh`) and the account signed in with `gh auth login`.
 
-## Requirements and limits
+## Requirements and limitations
 
 - macOS 14.6 or later.
 - Git is required. GitBar searches Homebrew and standard macOS locations when launched from Finder.

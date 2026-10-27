@@ -1,4 +1,4 @@
-The tap has no cask until a signed, stable release is available. Do not use a Homebrew install command before then.
+The tap has a cask for the latest stable release: `pedrotmr/git-bar/pedrotmr-git-bar`.
 
 # Homebrew
 
@@ -11,10 +11,15 @@ Before publishing a stable release:
 
 The cask uses a versioned ZIP URL and its real SHA-256. Do not use a draft URL or a made-up checksum. The cask does not delete app settings, files, or user repositories when it uninstalls.
 
-When Sparkle is enabled, the cask marks the app as Homebrew-managed. That app copy does not start Sparkle. Homebrew handles its updates. The cask clears only that marker when removed. Direct downloads use Sparkle.
+The cask marks the app as Homebrew-managed and clears only that marker when removed. The app does not start Sparkle for this copy. Direct downloads use Sparkle.
 
 The cask checks for macOS 14.6 or later before it installs GitBar. The app bundle and Sparkle feed carry the same minimum.
 
-Update Homebrew apps with `brew update && brew upgrade`. A named cask upgrade or a greedy upgrade can install the cask version over a newer Sparkle version. Use the ordinary `brew upgrade` command.
+Homebrew manages updates for this copy. To update only this cask, run:
 
-The install command is ready only after a cask exists in the tap and points to a public, signed, notarized release.
+```sh
+brew update
+brew upgrade --cask pedrotmr/git-bar/pedrotmr-git-bar
+```
+
+Direct downloads use Sparkle. Do not use the Homebrew command to update a direct download.
