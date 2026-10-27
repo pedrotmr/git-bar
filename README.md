@@ -10,24 +10,39 @@ A macOS menu bar app for managing Git branches, worktrees, stashes, and GitHub p
 
 ## Install and update
 
-The signed download and Homebrew cask are being prepared. The published v0.1.2 app is not notarized, so it is not suitable for a new installation. After a signed release is available, download its `GitBar-<version>.zip`, move `GitBar.app` to Applications, and open it. The Homebrew install command will be added here when the cask points to a verified public release.
+### Homebrew
 
-Direct downloads will update through Sparkle. Homebrew installations should update with `brew update && brew upgrade`. Use only the ordinary `brew upgrade` command; explicitly upgrading a named cask can reinstall an older cask version if Sparkle has already updated the app.
+```sh
+brew install --cask pedrotmr/git-bar/pedrotmr-git-bar
+```
+
+Homebrew manages updates for this copy. To update only GitBar, run:
+
+```sh
+brew update
+brew upgrade --cask --greedy-auto-updates pedrotmr/git-bar/pedrotmr-git-bar
+```
+
+### Direct download
+
+Download the latest stable `GitBar-<version>.dmg` or `.zip` from [GitHub Releases](https://github.com/pedrotmr/git-bar/releases/latest). Open the disk image and drag `GitBar.app` to Applications, or expand the ZIP and move the app to Applications.
+
+Direct installs can use **Check for Updates…** in the app. Version 0.2.0 is the first Sparkle release. For a predictable upgrade from v0.1.x, install the current release manually once.
 
 ## First steps
 
-Open GitBar from Applications and add a local Git repository. GitBar reads the repository's local branches, worktrees, and stashes. The pull request view uses GitHub CLI (`gh`) and the currently authenticated GitHub account.
+Open GitBar from Applications and add a local Git repository. GitBar reads its local branches, worktrees, and stashes. The pull request view uses GitHub CLI (`gh`) and the account signed in with `gh auth login`.
 
-## Requirements and limits
+## Requirements and limitations
 
 - macOS 14.6 or later.
-- Git is required. The app searches Homebrew and standard macOS locations when launched from Finder.
-- GitHub CLI is optional; install it with Homebrew and run `gh auth login` to use pull requests. GitHub access depends on the account and repository permissions configured in `gh`.
+- Git is required. GitBar searches Homebrew and standard macOS locations when launched from Finder.
+- GitHub CLI is optional. Install it with `brew install gh`, then run `gh auth login` to use pull requests. Your GitHub account must have access to each repository.
 - GitBar runs Git commands against repositories you select. It does not host or synchronize repository data.
-- This project is early-stage and maintained on a best-effort basis. Replies and release timing are not promised.
+- Maintenance is limited. Issues and pull requests are welcome on a best-effort basis. Replies and release dates are not promised.
 
 ## Help and development
 
 - **Questions and problems:** [GitHub Issues](https://github.com/pedrotmr/git-bar/issues)
-- **Setup and development:** [Documentation index](docs/README.md), [contribution guide](CONTRIBUTING.md)
+- **Setup and development:** [Documentation index](docs/README.md) and [contribution guide](CONTRIBUTING.md)
 - **License:** [MIT](LICENSE) · [Third-party notices](docs/THIRD-PARTY-NOTICES.md)
