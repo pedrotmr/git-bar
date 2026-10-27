@@ -46,10 +46,12 @@ Icon
 # *.a and *.xcframework tracked in .gitattributes
 
 # Sensitive / local
+*.env
 .env
 .env.*
 !.env.example
 *.pem
+__pycache__/
 
 # Omx
 .omx/

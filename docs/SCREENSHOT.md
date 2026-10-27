@@ -7,5 +7,5 @@ Use a temporary local repository with fictional branches and commits. Do not use
 One capture command after arranging the real app on screen is:
 
 ```sh
-screencapture -x Screenshots/git-bar.png
+screencapture -x -w Screenshots/git-bar.png
 ```

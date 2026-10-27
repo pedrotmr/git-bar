@@ -7,12 +7,17 @@ import Sparkle
 final class UpdateService {
     private let userDriverDelegate: UpdaterUserDriverDelegate
     private let controller: SPUStandardUpdaterController
+    private let managedByHomebrew: Bool
 
     init() {
         let userDriverDelegate = UpdaterUserDriverDelegate()
         self.userDriverDelegate = userDriverDelegate
         let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.GitBar.app"
-        let managedByHomebrew = HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier)
+        let installedVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        managedByHomebrew = HomebrewInstallDetector.isManagedByHomebrew(
+            bundleIdentifier: bundleIdentifier,
+            installedVersion: installedVersion
+        )
         controller = SPUStandardUpdaterController(
             startingUpdater: !managedByHomebrew,
             updaterDelegate: nil,
@@ -21,8 +26,7 @@ final class UpdateService {
     }
 
     func checkForUpdates() {
-        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.GitBar.app"
-        if HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier) {
+        if managedByHomebrew {
             let alert = NSAlert()
             alert.messageText = "Updates are managed by Homebrew"
             alert.informativeText = "Run `brew update && brew upgrade` to update GitBar."

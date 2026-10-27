@@ -56,6 +56,7 @@ class GitService {
     // Cached per-repo values for PR fetches (P4)
     private var cachedOwnerRepo: String?
     private var cachedUsername: String?
+    private var hasReportedGitHubCLIError = false
 
     private func cacheKey(_ path: String) -> String {
         (path as NSString).standardizingPath
@@ -268,8 +269,9 @@ class GitService {
             guard userResult.exitCode == 0 else {
                 pullRequests = []
                 let message = userResult.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !message.isEmpty {
+                if !message.isEmpty && !hasReportedGitHubCLIError {
                     appendError("GitHub CLI: \(message)")
+                    hasReportedGitHubCLIError = true
                 }
                 return
             }
@@ -279,6 +281,7 @@ class GitService {
                 return
             }
             cachedUsername = resolved
+            hasReportedGitHubCLIError = false
             username = resolved
         }
 

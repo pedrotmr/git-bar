@@ -5,6 +5,7 @@ import SwiftUI
 @Observable
 class SettingsService {
     private static let legacyBundleIdentifier = "pedrotmr.GitBar"
+    static let legacyMigrationCompleteKey = "didMigrateLegacyPreferences"
     private static let persistedKeys = [
         "repoPaths_v2",
         "selectedRepoPath_v2",
@@ -79,12 +80,15 @@ class SettingsService {
     }
 
     static func migrateLegacyPreferences(from legacy: UserDefaults?, to current: UserDefaults) {
-        guard let legacy else { return }
-        for key in persistedKeys where current.object(forKey: key) == nil {
-            if let value = legacy.object(forKey: key) {
-                current.set(value, forKey: key)
+        guard !current.bool(forKey: legacyMigrationCompleteKey) else { return }
+        if let legacy {
+            for key in persistedKeys where current.object(forKey: key) == nil {
+                if let value = legacy.object(forKey: key) {
+                    current.set(value, forKey: key)
+                }
             }
         }
+        current.set(true, forKey: legacyMigrationCompleteKey)
     }
 
     func addRepo(_ path: String) {

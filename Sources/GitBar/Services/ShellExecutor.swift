@@ -1,16 +1,16 @@
 import Foundation
 
-struct ShellResult {
+nonisolated struct ShellResult {
     let stdout: String
     let stderr: String
     let exitCode: Int32
 }
 
-enum ShellError: Error {
+nonisolated enum ShellError: Error {
     case timeout
 }
 
-struct ShellExecutor {
+nonisolated struct ShellExecutor {
     nonisolated static let defaultTimeout: TimeInterval = 30
 
     private static func augmentedEnvironment() -> [String: String] {

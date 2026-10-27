@@ -23,15 +23,21 @@ read_plist() {
 [[ -n "$(read_plist NSHumanReadableCopyright)" ]] || fail "Copyright metadata is empty."
 
 feed_url=$(read_plist SUFeedURL)
-[[ "$feed_url" == https://github.com/*/releases/latest/download/appcast.xml ]] || fail "Sparkle feed URL must target the stable appcast.xml."
+[[ "${SPARKLE_ENABLED:-}" == YES ]] || fail "Sparkle must be enabled in Config/App.xcconfig."
+[[ "$feed_url" == "$SPARKLE_FEED_URL" ]] || fail "Sparkle feed URL does not match Config/App.xcconfig."
 public_key=$(read_plist SUPublicEDKey)
-[[ -n "$public_key" && "$public_key" != PENDING_* ]] || fail "Sparkle public key is missing or still a placeholder."
+[[ -n "$public_key" && "$public_key" == "$SPARKLE_PUBLIC_ED_KEY" ]] || fail "Sparkle public key does not match Config/App.xcconfig."
 
 resources="$app_path/Contents/Resources"
-icon_name=$(read_plist CFBundleIconFile)
-[[ -n "$icon_name" ]] || fail "CFBundleIconFile is missing."
-[[ -f "$resources/$icon_name" || -f "$resources/$icon_name.icns" ]] || fail "The app bundle icon named in Info.plist is missing."
-[[ -f "$resources/Assets.car" ]] || [[ -n "$(find "$resources" -maxdepth 1 -name '*.icns' -print -quit)" ]] || fail "The app bundle does not contain a compiled icon or ICNS file."
+icon_name=$(read_plist CFBundleIconName)
+if [[ -n "$icon_name" ]]; then
+  [[ -s "$resources/Assets.car" ]] || fail "The app asset catalog is named but Assets.car is missing."
+else
+  icon_file=$(read_plist CFBundleIconFile)
+  [[ -n "$icon_file" ]] || fail "The app has no asset-catalog icon name or ICNS file name."
+  [[ -f "$resources/$icon_file" || -f "$resources/$icon_file.icns" ]] || fail "The app bundle icon named in Info.plist is missing."
+fi
+[[ -s "$resources/Assets.car" ]] || [[ -n "$(find "$resources" -maxdepth 1 -name '*.icns' -print -quit)" ]] || fail "The app bundle does not contain a compiled icon or ICNS file."
 [[ -f "$resources/Sparkle-LICENSE.txt" ]] || fail "Sparkle license notices are missing from the app bundle."
 
 sparkle="$app_path/Contents/Frameworks/Sparkle.framework"

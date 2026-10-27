@@ -22,12 +22,11 @@ final class CommandSearchPathTests: XCTestCase {
         XCTAssertEqual(entries.last, "/custom/bin")
     }
 
-    func testFindsSystemGitAndLeavesMissingGitHubCLIActionable() {
+    func testFindsSystemGitAndLeavesMissingGitHubCLIActionable() throws {
         let path = CommandSearchPath.augmentedPath(existingPath: nil, homeDirectory: "/Users/example")
 
-        let gitPath = CommandSearchPath.executablePath(for: "git", path: path)
-        XCTAssertNotNil(gitPath)
-        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: gitPath!))
+        let gitPath = try XCTUnwrap(CommandSearchPath.executablePath(for: "git", path: path))
+        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: gitPath))
         XCTAssertNil(CommandSearchPath.executablePath(for: "gh", path: "/empty"))
     }
 
@@ -56,9 +55,11 @@ final class CommandSearchPathTests: XCTestCase {
         let marker = UserDefaults(suiteName: domain)!
         defer { marker.removePersistentDomain(forName: domain) }
 
-        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, defaults: marker))
+        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "1.0", defaults: marker))
         marker.set(true, forKey: HomebrewInstallDetector.markerKey)
-        XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, defaults: marker))
+        marker.set("1.0", forKey: HomebrewInstallDetector.versionKey)
+        XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "1.0", defaults: marker))
+        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "2.0", defaults: marker))
         XCTAssertNil(UserDefaults(suiteName: bundleIdentifier)?.object(forKey: HomebrewInstallDetector.markerKey))
     }
 }

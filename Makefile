@@ -3,15 +3,19 @@ SCHEME := GitBar
 APP_NAME := $(shell sed -n 's/^PRODUCT_NAME = //p' Config/App.xcconfig)
 APP_BUNDLE_ID := $(shell sed -n 's/^PRODUCT_BUNDLE_IDENTIFIER = //p' Config/App.xcconfig)
 APP_MIN_SYSTEM_VERSION := $(shell sed -n 's/^MACOSX_DEPLOYMENT_TARGET = //p' Config/Project.xcconfig)
+SPARKLE_PUBLIC_ED_KEY := $(shell sed -n 's/^SPARKLE_PUBLIC_ED_KEY = //p' Config/App.xcconfig)
+SPARKLE_ENABLED := $(shell sed -n 's/^SPARKLE_ENABLED = //p' Config/App.xcconfig)
 RELEASE_OWNER := $(shell sed -n 's/^RELEASE_OWNER = //p' Config/App.xcconfig)
 RELEASE_SLUG := $(shell sed -n 's/^RELEASE_SLUG = //p' Config/App.xcconfig)
+SPARKLE_FEED_URL := https://github.com/$(RELEASE_OWNER)/$(RELEASE_SLUG)/releases/latest/download/appcast.xml
 SPARKLE_KEYCHAIN_ACCOUNT := $(RELEASE_SLUG)
 APP_VERSION := $(shell sed -n 's/^APP_MARKETING_VERSION = //p' Config/App.xcconfig)
-APP_BUILD_NUMBER ?= 1
+APP_BUILD_NUMBER ?= $(shell sed -n 's/^APP_BUILD_NUMBER = //p' Config/App.xcconfig)
 DERIVED_DATA := .build/DerivedData
 DEBUG_APP := $(DERIVED_DATA)/Build/Products/Debug/$(APP_NAME).app
 RELEASE_APP := $(DERIVED_DATA)/Build/Products/Release/$(APP_NAME).app
 XCODEBUILD ?= xcodebuild
+PYTHON ?= python3
 
 .PHONY: setup build run test bundle check release-check clean
 
@@ -30,6 +34,7 @@ test:
 	@$(XCODEBUILD) test -project $(PROJECT) -scheme $(SCHEME) -configuration Debug \
 		-derivedDataPath $(DERIVED_DATA) APP_MARKETING_VERSION=$(APP_VERSION) \
 		APP_BUILD_NUMBER=$(APP_BUILD_NUMBER) CODE_SIGNING_ALLOWED=NO
+	@$(PYTHON) -m unittest discover -s scripts/tests -p 'test_*.py'
 
 bundle:
 	@$(XCODEBUILD) build -project $(PROJECT) -scheme $(SCHEME) -configuration Release \
@@ -38,6 +43,8 @@ bundle:
 		ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO
 	@APP_BUNDLE_ID='$(APP_BUNDLE_ID)' APP_VERSION='$(APP_VERSION)' \
 		APP_BUILD_NUMBER='$(APP_BUILD_NUMBER)' APP_MIN_SYSTEM_VERSION='$(APP_MIN_SYSTEM_VERSION)' \
+		SPARKLE_ENABLED='$(SPARKLE_ENABLED)' SPARKLE_FEED_URL='$(SPARKLE_FEED_URL)' \
+		SPARKLE_PUBLIC_ED_KEY='$(SPARKLE_PUBLIC_ED_KEY)' \
 		scripts/check-app-bundle.sh '$(RELEASE_APP)'
 
 check:
@@ -56,6 +63,8 @@ release-check:
 		APP_VERSION='$(APP_VERSION)' APP_BUILD_NUMBER='$(APP_BUILD_NUMBER)' \
 		RELEASE_OWNER='$(RELEASE_OWNER)' RELEASE_SLUG='$(RELEASE_SLUG)' \
 		SPARKLE_KEYCHAIN_ACCOUNT='$(SPARKLE_KEYCHAIN_ACCOUNT)' \
+		SPARKLE_ENABLED='$(SPARKLE_ENABLED)' SPARKLE_FEED_URL='$(SPARKLE_FEED_URL)' \
+		SPARKLE_PUBLIC_ED_KEY='$(SPARKLE_PUBLIC_ED_KEY)' \
 		scripts/release-check.sh
 
 clean:

@@ -1,6 +1,6 @@
 import Foundation
 
-enum CommandSearchPath {
+nonisolated enum CommandSearchPath {
     static func augmentedPath(existingPath: String?, homeDirectory: String) -> String {
         let preferred = [
             "/opt/homebrew/bin",
