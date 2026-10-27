@@ -1,62 +1,41 @@
 # AGENTS.md
 
-## Project Snapshot
+## Project
 
-GitBar is a macOS menu bar app for working with a selected Git repository: branches, worktrees, stashes, and pull requests (via `gh` when available).
+GitBar is a macOS menu bar app for local Git branches, worktrees, stashes, and GitHub pull requests. The app's product identity and preferences domain are compatibility requirements: `GitBar`, `GitBar.app`, and `com.GitBar.app`.
 
-This repository is a VERY EARLY WIP. Proposing sweeping changes that improve long-term maintainability is encouraged.
+## Structure
 
-## Core Feature
+- `Sources/GitBar/`: app source grouped by `App/`, `Models/`, `Services/`, and `Views/`.
+- `Tests/GitBarTests/`: focused behavior tests.
+- `Config/`: shared build settings and the app's `Info.plist`.
+- `Resources/`: icon sources, asset catalog, and bundled license notices.
+- `scripts/`: setup, bundle checks, and local release checks.
+- `docs/`: specification, credentials, build, and distribution details.
 
-- **Menu bar + popover** — `NSStatusItem`, `NSPopover`, SwiftUI `ContentView` hosted in `AppDelegate`.
-- **Git and GitHub CLI** — `git` and `gh` invoked through `ShellExecutor`; parsing lives in `GitService` and related models.
+## Build and verification
 
-## Core Priorities
+Use Xcode 26.6 or newer and the Makefile interface. Xcode is the only app build system; Swift Package Manager is used by Xcode to resolve the pinned Sparkle dependency.
 
-1. Performance first.
-2. Reliability first.
-3. Keep behavior predictable when switching repositories, opening and closing the popover, refreshing from the file watcher or timers, and when `git` / `gh` exit with errors or missing tools.
-
-If a tradeoff is required, choose correctness and robustness over short-term convenience.
-
-## Maintainability
-
-Long term maintainability is a core priority. If you add new functionality, first check if there is shared logic that can be extracted to a separate module. Duplicate logic across multiple files is a code smell and should be avoided. Don't be afraid to change existing code. Don't take shortcuts by just adding local logic to solve a problem.
-
-## Practices
-
-- Match existing **naming** and layout under `GitBar/` (`Views/`, `Services/`, `Models/`, `App/`). Prefer **`@MainActor`** for app/UI and services that touch UI; run blocking shell work off the main actor (e.g. `Task.detached` + `ShellExecutor`) and merge results back on the main actor.
-- **Deduplicate** — extract shared rules; avoid one-off forks.
-- **Fix causes**, not symptoms; comments **brief and intent-only**.
-- **Verify** — Debug build passes; smoke the flows you touched. Add focused tests for non-trivial logic when practical.
-
-Treat **`git`** / **`gh`** and system paths as external; the app should degrade clearly when they are missing or misconfigured.
-
-## Stack conventions
-
-- Swift 5.x, arm64, deployment **macOS 14.6+** (see `GitBar.xcodeproj` for exact target).
-- **`@Observable`** — `GitService`, `SettingsService`; environment-injected from `AppDelegate`.
-
-## Model (rough)
-
-```
-AppDelegate
-  ├── GitService (@Observable) — repo path, branches, worktrees, stashes, pull requests, refresh, watcher, optional auto-fetch
-  └── SettingsService (@Observable) — repo list, selected repo, tab visibility, tab order, preferred terminal/editor
+```sh
+make setup
+make build
+make run
+make test
+make bundle
+make check
+make release-check APP_BUILD_NUMBER=<new-increasing-number>
 ```
 
-Persistence: **UserDefaults** for settings keys (see `SettingsService`).
+The first six commands need no credentials. `make release-check` requires a Developer ID Application identity, Apple notarization credentials, and this app's Sparkle EdDSA private key. It may create `.env`, writes build products under `.build/DerivedData`, writes release files under `.build/release`, and never publishes a release.
 
-## UI / layout
+## Compatibility and behavior
 
-SwiftUI: tabbed main surface (`AppTab`: branches, worktrees, stashes, pull requests), repo picker and settings as sliding panels. Popover size and hosting are owned by **`AppDelegate`** (`NSHostingController`).
+- Preserve the bundle identifier and existing UserDefaults keys. The app migrates settings from the older `pedrotmr.GitBar` domain without deleting the old values.
+- Keep Git and GitHub CLI optional failures clear. A Finder-launched app cannot rely on an interactive shell's PATH.
+- Sparkle and its private key are app-specific. Do not reuse another product's key.
+- Keep network and filesystem operations off the main actor where practical; keep user interface state on the main actor.
 
-**Git** — `GitRepositoryWatcher` can trigger refreshes; `GitService` coordinates `git` / `gh` calls and model updates.
+## Scope
 
-## Build
-
-```bash
-xcodebuild -project GitBar.xcodeproj -scheme GitBar -configuration Debug build
-```
-
-Release: `Scripts/release/` (ZIP/DMG, notarize, Sparkle-style flow as configured); CI on tag `v*` via `.github/workflows/release.yml`.
+Prefer small, tested changes. Add tests for critical new behavior and use `make check` before pull requests. Do not add a second build system or copy personal paths, credentials, private repository data, or real user data into examples.

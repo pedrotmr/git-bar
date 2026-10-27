@@ -6,16 +6,31 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A20000000000000000000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000003 /* Sparkle */; };
+		A20000000000000000000011 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* XCTest.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		4675AFEF2F7C14CE0099BC63 /* GitBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GitBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000004 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
+		A20000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000030 /* Project.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Project.xcconfig; sourceTree = "<group>"; };
+		A20000000000000000000010 /* GitBarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GitBarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000012 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4675AFF12F7C14CE0099BC63 /* GitBar */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = GitBar;
+			path = Sources/GitBar;
 			sourceTree = "<group>";
 		};
+		A20000000000000000000020 /* Resources */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Resources; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A20000000000000000000017 /* Tests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Tests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -23,9 +38,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A20000000000000000000001 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A20000000000000000000013 /* Test Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (A20000000000000000000011 /* XCTest.framework in Frameworks */,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -33,6 +50,9 @@
 			isa = PBXGroup;
 			children = (
 				4675AFF12F7C14CE0099BC63 /* GitBar */,
+				A20000000000000000000002 /* Config */,
+				A20000000000000000000020 /* Resources */,
+				A20000000000000000000017 /* Tests */,
 				4675AFF02F7C14CE0099BC63 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,10 +61,12 @@
 			isa = PBXGroup;
 			children = (
 				4675AFEF2F7C14CE0099BC63 /* GitBar.app */,
+				A20000000000000000000010 /* GitBarTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
+		A20000000000000000000002 /* Config */ = {isa = PBXGroup; children = (A20000000000000000000004 /* App.xcconfig */, A20000000000000000000030 /* Project.xcconfig */, A20000000000000000000005 /* Info.plist */,); path = Config; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -62,14 +84,17 @@
 			);
 			fileSystemSynchronizedGroups = (
 				4675AFF12F7C14CE0099BC63 /* GitBar */,
+				A20000000000000000000020 /* Resources */,
 			);
 			name = GitBar;
 			packageProductDependencies = (
+				A20000000000000000000003 /* Sparkle */,
 			);
 			productName = GitBar;
 			productReference = 4675AFEF2F7C14CE0099BC63 /* GitBar.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A20000000000000000000018 /* GitBarTests */ = {isa = PBXNativeTarget; buildConfigurationList = A2000000000000000000001D /* Build configuration list for GitBarTests */; buildPhases = (A20000000000000000000014 /* Test Sources */, A20000000000000000000013 /* Test Frameworks */, A20000000000000000000015 /* Test Resources */,); buildRules = (); dependencies = (A2000000000000000000001A /* GitBar host dependency */,); fileSystemSynchronizedGroups = (A20000000000000000000017 /* Tests */,); name = GitBarTests; productName = GitBarTests; productReference = A20000000000000000000010 /* GitBarTests.xctest */; productType = "com.apple.product-type.bundle.unit-test"; };
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -83,6 +108,7 @@
 					4675AFEE2F7C14CE0099BC63 = {
 						CreatedOnToolsVersion = 26.4;
 					};
+					A20000000000000000000018 = {CreatedOnToolsVersion = 27.1; TestTargetID = 4675AFEE2F7C14CE0099BC63;};
 				};
 			};
 			buildConfigurationList = 4675AFEA2F7C14CE0099BC63 /* Build configuration list for PBXProject "GitBar" */;
@@ -96,10 +122,12 @@
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4675AFF02F7C14CE0099BC63 /* Products */;
+			packageReferences = (A20000000000000000000006 /* XCRemoteSwiftPackageReference Sparkle */,);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				4675AFEE2F7C14CE0099BC63 /* GitBar */,
+				A20000000000000000000018 /* GitBarTests */,
 			);
 		};
 /* End PBXProject section */
@@ -114,6 +142,10 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXResourcesBuildPhase section */
+		A20000000000000000000015 /* Test Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		4675AFEB2F7C14CE0099BC63 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -124,9 +156,22 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXSourcesBuildPhase section */
+		A20000000000000000000014 /* Test Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXContainerItemProxy section */
+		A20000000000000000000019 /* GitBar host proxy */ = {isa = PBXContainerItemProxy; containerPortal = 4675AFE72F7C14CE0099BC63 /* Project object */; proxyType = 1; remoteGlobalIDString = 4675AFEE2F7C14CE0099BC63; remoteInfo = GitBar; };
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		A2000000000000000000001A /* GitBar host dependency */ = {isa = PBXTargetDependency; target = 4675AFEE2F7C14CE0099BC63 /* GitBar */; targetProxy = A20000000000000000000019 /* GitBar host proxy */; };
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		4675AFF82F7C14CF0099BC63 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000030 /* Project.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -160,7 +205,6 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = YW25U2BJ23;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -179,11 +223,9 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.3;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -191,6 +233,7 @@
 		};
 		4675AFF92F7C14CF0099BC63 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000030 /* Project.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -224,7 +267,6 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = YW25U2BJ23;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -237,77 +279,23 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
 		};
 		4675AFFB2F7C14CF0099BC63 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000004 /* App.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = YW25U2BJ23;
-				ENABLE_APP_SANDBOX = NO;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = GitBar;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				PRODUCT_BUNDLE_IDENTIFIER = com.GitBar.app;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
 		4675AFFC2F7C14CF0099BC63 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000004 /* App.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = YW25U2BJ23;
-				ENABLE_APP_SANDBOX = NO;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = GitBar;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				PRODUCT_BUNDLE_IDENTIFIER = com.GitBar.app;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
@@ -332,6 +320,23 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A20000000000000000000006 /* XCRemoteSwiftPackageReference Sparkle */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/sparkle-project/Sparkle"; requirement = {kind = exactVersion; version = 2.10.1;}; };
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A20000000000000000000003 /* Sparkle */ = {isa = XCSwiftPackageProductDependency; package = A20000000000000000000006 /* XCRemoteSwiftPackageReference Sparkle */; productName = Sparkle; };
+/* End XCSwiftPackageProductDependency section */
+
+/* Begin XCBuildConfiguration section */
+		A2000000000000000000001B /* GitBarTests Debug */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.GitBar.app.tests; PRODUCT_NAME = "$(TARGET_NAME)"; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GitBar.app/Contents/MacOS/GitBar";}; name = Debug; };
+		A2000000000000000000001C /* GitBarTests Release */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.GitBar.app.tests; PRODUCT_NAME = "$(TARGET_NAME)"; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GitBar.app/Contents/MacOS/GitBar";}; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A2000000000000000000001D /* Build configuration list for GitBarTests */ = {isa = XCConfigurationList; buildConfigurations = (A2000000000000000000001B /* GitBarTests Debug */, A2000000000000000000001C /* GitBarTests Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCConfigurationList section */
 	};
 	rootObject = 4675AFE72F7C14CE0099BC63 /* Project object */;

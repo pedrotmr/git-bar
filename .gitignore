@@ -14,6 +14,8 @@ DerivedData/
 
 # Build
 build/
+.build/
+DerivedData/
 
 # Swift Package Manager
 .build/
@@ -45,7 +47,11 @@ Icon
 
 # Sensitive / local
 *.env
+.env
+.env.*
+!.env.example
 *.pem
+__pycache__/
 
 # Omx
 .omx/
