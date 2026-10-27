@@ -53,13 +53,21 @@ final class CommandSearchPathTests: XCTestCase {
         let bundleIdentifier = "com.example.GitBarTest.\(UUID().uuidString)"
         let domain = HomebrewInstallDetector.preferencesDomain(for: bundleIdentifier)
         let marker = UserDefaults(suiteName: domain)!
+        let bundleURL = URL(fileURLWithPath: "/Applications/GitBar.app")
         defer { marker.removePersistentDomain(forName: domain) }
 
-        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "1.0", defaults: marker))
+        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "1.0", bundleURL: bundleURL, defaults: marker))
         marker.set(true, forKey: HomebrewInstallDetector.markerKey)
         marker.set("1.0", forKey: HomebrewInstallDetector.versionKey)
-        XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "1.0", defaults: marker))
-        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "2.0", defaults: marker))
+        marker.set(bundleURL.path, forKey: HomebrewInstallDetector.bundlePathKey)
+        XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "1.0", bundleURL: bundleURL, defaults: marker))
+        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "2.0", bundleURL: bundleURL, defaults: marker))
+        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(
+            bundleIdentifier: bundleIdentifier,
+            installedVersion: "1.0",
+            bundleURL: URL(fileURLWithPath: "/Users/example/Downloads/GitBar.app"),
+            defaults: marker
+        ))
         XCTAssertNil(UserDefaults(suiteName: bundleIdentifier)?.object(forKey: HomebrewInstallDetector.markerKey))
     }
 }

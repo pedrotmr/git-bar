@@ -62,6 +62,8 @@ class UpdateCaskTests(unittest.TestCase):
         self.assertIn('version "1.2.0"', content)
         self.assertIn(f'sha256 "{checksum}"', content)
         self.assertIn("auto_updates true", content)
+        self.assertIn('"managedByHomebrewBundlePath", "-string", "#{appdir}/Demo.app"', content)
+        self.assertIn('"delete", "com.example.Demo.homebrew", "managedByHomebrewBundlePath"', content)
         self.assertIn('if MacOS.full_version < "14.6"', content)
 
     def test_older_release_does_not_replace_a_newer_cask(self):
