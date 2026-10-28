@@ -13,7 +13,7 @@
   
 
 
-https://github.com/user-attachments/assets/19a36146-a8f7-4984-a5d5-730613cc2336
+[Watch the full video](https://github.com/user-attachments/assets/19a36146-a8f7-4984-a5d5-730613cc2336)
 
 
   
