@@ -2,6 +2,21 @@
 
 Releases are versioned with SemVer. Release notes for the next version are prepared in the release pull request.
 
+## [0.3.0](https://github.com/pedrotmr/git-bar/compare/v0.2.1...v0.3.0) (2026-10-29)
+
+
+### Features
+
+* **homebrew:** offer in-app updates ([c2ee048](https://github.com/pedrotmr/git-bar/commit/c2ee0487cc140d6156dc691dd3bfd6efcb88ccb6))
+* **homebrew:** offer in-app updates ([#15](https://github.com/pedrotmr/git-bar/issues/15)) ([2ab4c73](https://github.com/pedrotmr/git-bar/commit/2ab4c737680847ac4a04d8c3b8c14502361dfbd8))
+
+
+### Bug Fixes
+
+* **ui:** dismiss and standardize tooltips ([f592ad6](https://github.com/pedrotmr/git-bar/commit/f592ad6b2ef8236b5a0335954ffadab231c7256a))
+* **ui:** dismiss and standardize tooltips ([#14](https://github.com/pedrotmr/git-bar/issues/14)) ([949c0de](https://github.com/pedrotmr/git-bar/commit/949c0deb8cde5de0796fa14649eb14871cb3baa7))
+* **updates:** preserve Homebrew check behavior ([671b2b8](https://github.com/pedrotmr/git-bar/commit/671b2b8bd61aba7841057a5a8ad58081b18860aa))
+
 ## [0.2.1](https://github.com/pedrotmr/git-bar/compare/v0.2.0...v0.2.1) (2026-10-27)
 
 
