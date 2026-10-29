@@ -38,8 +38,7 @@ brew install --cask pedrotmr/git-bar/pedrotmr-git-bar
 Homebrew manages updates for this copy. **Check for Updates…** offers an in-app Sparkle update or a Homebrew command only when an update is available. To update only GitBar in Terminal:
 
 ```sh
-brew update
-brew upgrade --cask --greedy-auto-updates pedrotmr/git-bar/pedrotmr-git-bar
+brew upgrade --cask pedrotmr/git-bar/pedrotmr-git-bar
 ```
 
 ### Option 2: Direct download

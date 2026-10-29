@@ -29,7 +29,7 @@ final class UpdateService {
         if managedByHomebrew {
             let userDriver = HomebrewUserDriver(
                 appName: "GitBar",
-                updateCommand: "brew update && brew upgrade --cask --greedy-auto-updates pedrotmr/git-bar/pedrotmr-git-bar",
+                updateCommand: "brew upgrade --cask pedrotmr/git-bar/pedrotmr-git-bar",
                 hostBundle: bundle,
                 delegate: userDriverDelegate
             )
