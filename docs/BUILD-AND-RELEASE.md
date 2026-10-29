@@ -58,8 +58,7 @@ GitHub gates signing jobs with the `signed-distribution` environment. Its deploy
 Direct downloads use Sparkle's **Check for Updates…** command. Homebrew installs can use the same command to choose a Sparkle update or copy the Homebrew command when an update is available. To update only the Homebrew copy in Terminal, run:
 
 ```sh
-brew update
-brew upgrade --cask --greedy-auto-updates pedrotmr/git-bar/pedrotmr-git-bar
+brew upgrade --cask pedrotmr/git-bar/pedrotmr-git-bar
 ```
 
 The cask marks the app as Homebrew-managed. It stores the install-time app version and bundle path in a separate UserDefaults domain. GitBar uses the marker and bundle path to recognize the Homebrew copy after an in-app update changes its version. The cask removes these markers when it uninstalls the app. It does not remove GitBar settings or repository data.
