@@ -1,5 +1,6 @@
 @testable import GitBar
 import XCTest
+import Sparkle
 
 @MainActor
 final class CommandSearchPathTests: XCTestCase {
@@ -56,18 +57,24 @@ final class CommandSearchPathTests: XCTestCase {
         let bundleURL = URL(fileURLWithPath: "/Applications/GitBar.app")
         defer { marker.removePersistentDomain(forName: domain) }
 
-        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "1.0", bundleURL: bundleURL, defaults: marker))
+        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, bundleURL: bundleURL, defaults: marker))
         marker.set(true, forKey: HomebrewInstallDetector.markerKey)
         marker.set("1.0", forKey: HomebrewInstallDetector.versionKey)
         marker.set(bundleURL.path, forKey: HomebrewInstallDetector.bundlePathKey)
-        XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "1.0", bundleURL: bundleURL, defaults: marker))
-        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "2.0", bundleURL: bundleURL, defaults: marker))
+        XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, bundleURL: bundleURL, defaults: marker))
+        marker.set("2.0", forKey: HomebrewInstallDetector.versionKey)
+        XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, bundleURL: bundleURL, defaults: marker))
         XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(
             bundleIdentifier: bundleIdentifier,
-            installedVersion: "1.0",
             bundleURL: URL(fileURLWithPath: "/Users/example/Downloads/GitBar.app"),
             defaults: marker
         ))
         XCTAssertNil(UserDefaults(suiteName: bundleIdentifier)?.object(forKey: HomebrewInstallDetector.markerKey))
+    }
+
+    func testHomebrewUpdateChecksAllowManualChecksButBlockScheduledChecks() {
+        XCTAssertTrue(HomebrewUpdateCheckPolicy.allows(.updates, managedByHomebrew: true))
+        XCTAssertFalse(HomebrewUpdateCheckPolicy.allows(.updatesInBackground, managedByHomebrew: true))
+        XCTAssertTrue(HomebrewUpdateCheckPolicy.allows(.updatesInBackground, managedByHomebrew: false))
     }
 }
