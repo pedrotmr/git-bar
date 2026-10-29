@@ -56,15 +56,13 @@ final class CommandSearchPathTests: XCTestCase {
         let bundleURL = URL(fileURLWithPath: "/Applications/GitBar.app")
         defer { marker.removePersistentDomain(forName: domain) }
 
-        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "1.0", bundleURL: bundleURL, defaults: marker))
+        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, bundleURL: bundleURL, defaults: marker))
         marker.set(true, forKey: HomebrewInstallDetector.markerKey)
         marker.set("1.0", forKey: HomebrewInstallDetector.versionKey)
         marker.set(bundleURL.path, forKey: HomebrewInstallDetector.bundlePathKey)
-        XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "1.0", bundleURL: bundleURL, defaults: marker))
-        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, installedVersion: "2.0", bundleURL: bundleURL, defaults: marker))
+        XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier, bundleURL: bundleURL, defaults: marker))
         XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(
             bundleIdentifier: bundleIdentifier,
-            installedVersion: "1.0",
             bundleURL: URL(fileURLWithPath: "/Users/example/Downloads/GitBar.app"),
             defaults: marker
         ))

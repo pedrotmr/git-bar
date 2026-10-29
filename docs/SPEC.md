@@ -8,7 +8,7 @@ GitBar is a menu bar companion for working with local Git repositories.
 - Lists GitHub pull requests for the repository when GitHub CLI is installed and authenticated.
 - Supports common branch, worktree, stash, and pull request actions from the menu bar popover.
 - Saves repository selection and display preferences in UserDefaults.
-- Offers Sparkle updates for direct downloads. Homebrew installs are directed to Homebrew for updates.
+- Offers Sparkle updates for direct downloads. Homebrew installs check the Sparkle feed on request and can choose an in-app update or copy the Homebrew command when an update is available.
 
 ## Scope and limits
 
@@ -18,4 +18,4 @@ GitBar operates on repositories on the current Mac. Git is required. GitHub CLI 
 
 - Stable releases provide signed and notarized downloads on GitHub Releases.
 - The `pedrotmr/homebrew-git-bar` tap provides a Homebrew cask.
-- Direct downloads use Sparkle for updates. Homebrew installs use Homebrew for updates.
+- Direct downloads use Sparkle for updates. Homebrew installs can use Sparkle in-app or Homebrew for updates.

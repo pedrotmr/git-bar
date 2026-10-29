@@ -35,7 +35,7 @@ Choose one installation method:
 brew install --cask pedrotmr/git-bar/pedrotmr-git-bar
 ```
 
-Homebrew manages updates for this copy. To update only GitBar:
+Homebrew manages updates for this copy. **Check for Updates…** offers an in-app Sparkle update or a Homebrew command only when an update is available. To update only GitBar in Terminal:
 
 ```sh
 brew update
