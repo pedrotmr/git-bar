@@ -216,7 +216,7 @@ struct ContentView: View {
         switch tab {
         case .branches: return "Branches"
         case .worktrees: return "Worktrees"
-        case .stashes: return "Stash"
+        case .stashes: return "Stashes"
         case .pullRequests: return "PRs"
         }
     }
@@ -491,7 +491,7 @@ struct BottomBar: View {
             }
             .disabled(gitService.repoPath.isEmpty || gitService.isLoading)
 
-            IconButton(systemImage: "arrow.down.circle", tooltip: "Check for Updates…") {
+            IconButton(systemImage: "arrow.down.circle", tooltip: "Check for updates…") {
                 updateService.checkForUpdates()
             }
 

@@ -53,8 +53,8 @@ struct WorktreeRowView: View {
             } else if isHovered {
                 HStack(spacing: 2) {
                     HoverIconButton(systemImage: "folder", tooltip: "Open in Finder", action: openInFinder)
-                    HoverIconButton(systemImage: "terminal", tooltip: "Open in Terminal", action: openInTerminal)
-                    HoverIconButton(systemImage: "chevron.left.forwardslash.chevron.right", tooltip: "Open in Editor", action: openInEditor)
+                    HoverIconButton(systemImage: "terminal", tooltip: "Open in terminal", action: openInTerminal)
+                    HoverIconButton(systemImage: "chevron.left.forwardslash.chevron.right", tooltip: "Open in editor", action: openInEditor)
                     if !worktree.isMain && !worktree.isBare {
                         HoverIconButton(systemImage: "trash", tooltip: "Delete worktree") {
                             triggerDelete()

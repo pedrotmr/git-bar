@@ -25,7 +25,7 @@ struct BranchRowView: View {
 
             // Always reserve space; reveal on hover to avoid layout shift
             HStack(spacing: 2) {
-                HoverIconButton(systemImage: "arrow.trianglehead.swap", tooltip: "Switch to Branch") {
+                HoverIconButton(systemImage: "arrow.trianglehead.swap", tooltip: "Switch to branch") {
                     Task { await gitService.switchBranch(branch.name) }
                 }
                 .opacity(isHovered && !branch.isCurrent ? 1 : 0)
