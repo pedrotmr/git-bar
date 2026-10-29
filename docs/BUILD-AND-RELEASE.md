@@ -65,7 +65,7 @@ The cask marks the app as Homebrew-managed. It stores the install-time app versi
 
 To switch the same app copy from Homebrew to a direct download, run `brew uninstall --cask pedrotmr-git-bar` first, then install the downloaded app. Homebrew owns the app path while its cask is installed.
 
-Homebrew compares the installed app version with the versioned cask when it can read the app bundle. It skips the cask when the installed app appears to be the same version or newer. See [Homebrew's FAQ](https://docs.brew.sh/FAQ#how-does-brew-upgrade-handle-apps-that-update-themselves). The tap has a cask for the latest stable release. After each stable release, the workflow checks the ZIP, calculates its SHA-256, audits the cask, and updates the tap. It needs `HOMEBREW_TAP_TOKEN` with write access to that tap.
+For an untargeted `brew upgrade`, Homebrew compares the installed app version with a versioned cask when it can read the app bundle and skips it when the app appears to be the same version or newer. See [Homebrew's FAQ](https://docs.brew.sh/FAQ#how-does-brew-upgrade-handle-apps-that-update-themselves). The explicitly named command in the Homebrew guide targets the version currently available in the local tap, so use it after the tap contains the release you want. After each stable release, the workflow checks the ZIP, calculates its SHA-256, audits the cask, and updates the tap. It needs `HOMEBREW_TAP_TOKEN` with write access to that tap.
 
 Version v0.1.2 predates Sparkle. Install the current stable release manually once to move to Sparkle updates. The older custom updater has not been tested with the signed release, so do not rely on it for this migration.
 
