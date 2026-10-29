@@ -17,19 +17,19 @@ struct SettingsView: View {
 
             Form {
                 Section("Tabs") {
-                    Toggle("Show Branches", isOn: $settingsService.showBranchesTab)
+                    Toggle("Show branches", isOn: $settingsService.showBranchesTab)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
 
-                    Toggle("Show Stash", isOn: $settingsService.showStashTab)
+                    Toggle("Show stashes", isOn: $settingsService.showStashTab)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
 
-                    Toggle("Show Worktrees", isOn: $settingsService.showWorktreeTab)
+                    Toggle("Show worktrees", isOn: $settingsService.showWorktreeTab)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
 
-                    Toggle("Show Pull Requests", isOn: $settingsService.showPRTab)
+                    Toggle("Show pull requests", isOn: $settingsService.showPRTab)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                 }
@@ -44,7 +44,7 @@ struct SettingsView: View {
                                 .onHover { showAutoFetchInfo = $0 }
                                 .popover(isPresented: $showAutoFetchInfo, arrowEdge: .bottom) {
                                     VStack(alignment: .leading, spacing: 5) {
-                                        Text("Auto-fetch from Remote")
+                                        Text("Auto-fetch from remote")
                                             .font(.system(size: 12, weight: .semibold))
                                         Text("Runs git fetch --all every 60 seconds in the background to keep remote tracking branches up to date.")
                                             .font(.system(size: 11))

@@ -56,6 +56,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 // Track popover dismissal when user clicks outside (transient behavior)
 extension AppDelegate: NSPopoverDelegate {
     func popoverDidClose(_ notification: Notification) {
+        TooltipManager.shared.hide()
         gitService.isPopoverVisible = false
     }
 }
