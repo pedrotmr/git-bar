@@ -21,6 +21,7 @@ final class UpdateService {
     init() {
         let bundle = Bundle.main
         let bundleIdentifier = bundle.bundleIdentifier ?? "com.GitBar.app"
+        LegacyAutomaticChecksMigration.run(defaults: .standard, bundleIdentifier: bundleIdentifier)
         managedByHomebrew = HomebrewInstallDetector.isManagedByHomebrew(
             bundleIdentifier: bundleIdentifier,
             bundleURL: bundle.bundleURL
@@ -223,6 +224,23 @@ struct UpdateProbeSchedule {
     private static func isNoUpdateError(_ error: Error) -> Bool {
         let nsError = error as NSError
         return nsError.domain == SUSparkleErrorDomain && nsError.code == Int(SUError.noUpdateError.rawValue)
+    }
+}
+
+enum LegacyAutomaticChecksMigration {
+    static let automaticChecksKey = "SUEnableAutomaticChecks"
+    static let migrationKey = "GitBar.DidMigrateForcedAutomaticChecks"
+
+    static func run(defaults: UserDefaults, bundleIdentifier: String) {
+        let appPreferences = defaults.persistentDomain(forName: bundleIdentifier) ?? [:]
+        guard appPreferences[migrationKey] as? Bool != true else { return }
+
+        // Older GitBar versions wrote false here unconditionally. Remove only that app-domain override once,
+        // allowing the bundle's enabled default to take effect. Later user choices remain untouched.
+        if appPreferences[automaticChecksKey] as? Bool == false {
+            defaults.removeObject(forKey: automaticChecksKey)
+        }
+        defaults.set(true, forKey: migrationKey)
     }
 }
 

@@ -117,4 +117,29 @@ final class CommandSearchPathTests: XCTestCase {
             .some(86_400)
         )
     }
+
+    func testLegacyForcedAutomaticChecksValueIsRemovedOnlyOnce() {
+        let bundleIdentifier = "com.example.GitBarTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: bundleIdentifier)!
+        defer { defaults.removePersistentDomain(forName: bundleIdentifier) }
+        defaults.set(false, forKey: LegacyAutomaticChecksMigration.automaticChecksKey)
+
+        LegacyAutomaticChecksMigration.run(defaults: defaults, bundleIdentifier: bundleIdentifier)
+
+        XCTAssertNil(defaults.persistentDomain(forName: bundleIdentifier)?[
+            LegacyAutomaticChecksMigration.automaticChecksKey
+        ])
+        XCTAssertEqual(
+            defaults.persistentDomain(forName: bundleIdentifier)?[LegacyAutomaticChecksMigration.migrationKey] as? Bool,
+            true
+        )
+
+        defaults.set(false, forKey: LegacyAutomaticChecksMigration.automaticChecksKey)
+        LegacyAutomaticChecksMigration.run(defaults: defaults, bundleIdentifier: bundleIdentifier)
+
+        XCTAssertEqual(
+            defaults.persistentDomain(forName: bundleIdentifier)?[LegacyAutomaticChecksMigration.automaticChecksKey] as? Bool,
+            false
+        )
+    }
 }
