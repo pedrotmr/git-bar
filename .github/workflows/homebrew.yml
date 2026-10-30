@@ -30,6 +30,7 @@ jobs:
       - name: Check stable release and download ZIP
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.release.tag_name }}
         run: |
           set -euo pipefail
@@ -40,6 +41,16 @@ jobs:
           release_json=$(gh release view "$RELEASE_TAG" --repo "pedrotmr/git-bar" --json isDraft,isPrerelease)
           if [[ "$(jq -r '.isDraft' <<< "$release_json")" != false || "$(jq -r '.isPrerelease' <<< "$release_json")" != false ]]; then
             echo "::error::Only published stable releases can update the Homebrew tap."
+            exit 1
+          fi
+          latest_tag=$(gh api "repos/$GH_REPO/releases/latest" --jq '.tag_name')
+          if [[ "$latest_tag" != "$RELEASE_TAG" ]]; then
+            echo "::error::Only the GitHub Latest release can update the Homebrew tap."
+            exit 1
+          fi
+          comparison=$(gh api "repos/$GH_REPO/compare/main...$RELEASE_TAG" --jq '.status')
+          if [[ "$comparison" != "behind" && "$comparison" != "identical" ]]; then
+            echo "::error::The selected release tag must point to a commit already on main."
             exit 1
           fi
           version=${RELEASE_TAG#v}
