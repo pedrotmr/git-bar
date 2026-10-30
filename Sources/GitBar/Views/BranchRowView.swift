@@ -175,7 +175,7 @@ struct BranchRowView: View {
 
     private func needsDeleteConfirmation() async -> Bool {
         if settingsService.confirmBranchDeletion { return true }
-        return await gitService.branchHasUncommittedChanges(branch.name)
+        return await gitService.branchNeedsDeleteConfirmation(branch.name)
     }
 
     private func deleteBranch() async {

@@ -10,6 +10,12 @@ private struct RepoSnapshot {
     let cachedUsername: String?
 }
 
+private enum WorktreeChangeStatus: Equatable {
+    case clean
+    case changed
+    case unavailable
+}
+
 @MainActor
 @Observable
 class GitService {
@@ -148,9 +154,19 @@ class GitService {
         }
     }
 
-    private func runGit(_ args: [String], at path: String? = nil, timeout: TimeInterval = ShellExecutor.defaultTimeout) async -> ShellResult {
+    private func runGit(
+        _ args: [String],
+        at path: String? = nil,
+        timeout: TimeInterval = ShellExecutor.defaultTimeout,
+        environmentOverrides: [String: String] = [:]
+    ) async -> ShellResult {
         let executionPath = path ?? self.repoPath
-        return await ShellExecutor.run(args, at: executionPath, timeout: timeout)
+        return await ShellExecutor.run(
+            args,
+            at: executionPath,
+            timeout: timeout,
+            environmentOverrides: environmentOverrides
+        )
     }
 
     private func runGH(_ args: [String], timeout: TimeInterval = ShellExecutor.defaultTimeout) async -> ShellResult {
@@ -167,7 +183,10 @@ class GitService {
     }
 
     func fetchBranches() async {
-        let result = await runGit(["branch", "--format=%(refname:short)%09%(HEAD)%09%(upstream:short)%09%(upstream:track,nobracket)"])
+        let result = await runGit(
+            ["branch", "--format=%(refname:short)%09%(HEAD)%09%(upstream:short)%09%(upstream:track,nobracket)"],
+            environmentOverrides: ["LC_ALL": "C"]
+        )
         guard result.exitCode == 0 else {
             appendError(result.stderr.trimmingCharacters(in: .whitespacesAndNewlines))
             return
@@ -528,13 +547,23 @@ class GitService {
     }
 
     func hasUncommittedChanges(_ path: String) async -> Bool {
-        let result = await runGit(["status", "--porcelain"], at: path)
-        return result.exitCode == 0 && !result.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        await worktreeChangeStatus(at: path) == .changed
     }
 
     func branchHasUncommittedChanges(_ branchName: String) async -> Bool {
         guard let worktree = worktrees.first(where: { $0.branch == branchName }) else { return false }
         return await hasUncommittedChanges(worktree.path)
+    }
+
+    func branchNeedsDeleteConfirmation(_ branchName: String) async -> Bool {
+        guard let worktree = worktrees.first(where: { $0.branch == branchName }) else { return false }
+        return await worktreeChangeStatus(at: worktree.path) != .clean
+    }
+
+    private func worktreeChangeStatus(at path: String) async -> WorktreeChangeStatus {
+        let result = await runGit(["status", "--porcelain"], at: path)
+        guard result.exitCode == 0 else { return .unavailable }
+        return result.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .clean : .changed
     }
 
     func isGitRepo(_ path: String) async -> Bool {

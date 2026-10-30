@@ -34,6 +34,27 @@ final class BranchWorktreeStatusTests: XCTestCase {
         XCTAssertFalse(dirtyOther)
     }
 
+    func testRequiresDeleteConfirmationWhenWorktreeStatusIsUnavailable() async throws {
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("GitBarTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: path) }
+
+        let service = GitService()
+        service.worktrees = [Worktree(
+            path: path.path,
+            branch: "feature",
+            commitHash: nil,
+            isBare: false,
+            isMain: true
+        )]
+
+        let hasChanges = await service.branchHasUncommittedChanges("feature")
+        let needsConfirmation = await service.branchNeedsDeleteConfirmation("feature")
+        XCTAssertFalse(hasChanges)
+        XCTAssertTrue(needsConfirmation)
+    }
+
     private func runGit(_ arguments: [String], at path: URL) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
