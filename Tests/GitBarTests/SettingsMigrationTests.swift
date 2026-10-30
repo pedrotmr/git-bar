@@ -11,12 +11,14 @@ final class SettingsMigrationTests: XCTestCase {
         legacy.defaults.set(["/tmp/demo-repository"], forKey: "repoPaths_v2")
         legacy.defaults.set("/tmp/demo-repository", forKey: "selectedRepoPath_v2")
         legacy.defaults.set("vscode", forKey: "preferredEditor")
+        legacy.defaults.set(false, forKey: "confirmBranchDeletion")
 
         SettingsService.migrateLegacyPreferences(from: legacy.defaults, to: current.defaults)
 
         XCTAssertEqual(current.defaults.stringArray(forKey: "repoPaths_v2"), ["/tmp/demo-repository"])
         XCTAssertEqual(current.defaults.string(forKey: "selectedRepoPath_v2"), "/tmp/demo-repository")
         XCTAssertEqual(current.defaults.string(forKey: "preferredEditor"), "vscode")
+        XCTAssertEqual(current.defaults.object(forKey: "confirmBranchDeletion") as? Bool, false)
         XCTAssertEqual(legacy.defaults.string(forKey: "selectedRepoPath_v2"), "/tmp/demo-repository")
     }
 

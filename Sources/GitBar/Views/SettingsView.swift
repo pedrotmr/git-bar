@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var installedTerminals: [SupportedTerminal] = []
     @State private var installedEditors: [SupportedEditor] = []
     @State private var showAutoFetchInfo = false
+    @State private var showBranchDeleteInfo = false
 
     var body: some View {
         @Bindable var settingsService = settingsService
@@ -58,14 +59,40 @@ struct SettingsView: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                }
 
-                Section("Updates") {
-                    Button("Check for Updates…") {
-                        updateService.checkForUpdates()
+                    Toggle(isOn: $settingsService.confirmBranchDeletion) {
+                        HStack(spacing: 6) {
+                            Text("Confirm branch deletions")
+                            Image(systemName: "info.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(showBranchDeleteInfo ? Color.accentColor.opacity(0.7) : Color.secondary.opacity(0.5))
+                                .onHover { showBranchDeleteInfo = $0 }
+                                .popover(isPresented: $showBranchDeleteInfo, arrowEdge: .bottom) {
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text("Confirm branch deletions")
+                                            .font(.system(size: 12, weight: .semibold))
+                                        Text("Turn this off to skip confirmations for clean branches. GitBar still asks before deleting a branch whose worktree has uncommitted changes.")
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.secondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    .padding(12)
+                                    .frame(width: 250)
+                                }
+                        }
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
+                }
+
+                if let version = updateService.availableUpdateVersion {
+                    Section("Updates") {
+                        Button("Update to \(version)…") {
+                            updateService.installAvailableUpdate()
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                    }
                 }
 
                 Section("Open With") {

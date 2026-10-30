@@ -13,19 +13,31 @@ nonisolated enum ShellError: Error {
 nonisolated struct ShellExecutor {
     nonisolated static let defaultTimeout: TimeInterval = 30
 
-    private static func augmentedEnvironment() -> [String: String] {
+    private static func augmentedEnvironment(overrides: [String: String]) -> [String: String] {
         var env = ProcessInfo.processInfo.environment
         let home = env["HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.path
         env["PATH"] = CommandSearchPath.augmentedPath(existingPath: env["PATH"], homeDirectory: home)
+        env.merge(overrides, uniquingKeysWith: { _, override in override })
         return env
     }
 
-    static func run(_ args: [String], at directory: String? = nil, timeout: TimeInterval = defaultTimeout) async -> ShellResult {
-        await run("git", args, at: directory, timeout: timeout)
+    static func run(
+        _ args: [String],
+        at directory: String? = nil,
+        timeout: TimeInterval = defaultTimeout,
+        environmentOverrides: [String: String] = [:]
+    ) async -> ShellResult {
+        await run("git", args, at: directory, timeout: timeout, environmentOverrides: environmentOverrides)
     }
 
-    static func run(_ binary: String, _ args: [String], at directory: String? = nil, timeout: TimeInterval = defaultTimeout) async -> ShellResult {
-        let environment = augmentedEnvironment()
+    static func run(
+        _ binary: String,
+        _ args: [String],
+        at directory: String? = nil,
+        timeout: TimeInterval = defaultTimeout,
+        environmentOverrides: [String: String] = [:]
+    ) async -> ShellResult {
+        let environment = augmentedEnvironment(overrides: environmentOverrides)
         guard let executablePath = CommandSearchPath.executablePath(
             for: binary,
             path: environment["PATH"] ?? ""
