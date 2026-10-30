@@ -2,6 +2,13 @@
 
 Releases are versioned with SemVer. Release notes for the next version are prepared in the release pull request.
 
+## [0.4.2](https://github.com/pedrotmr/git-bar/compare/v0.4.1...v0.4.2) (2026-10-30)
+
+
+### Bug Fixes
+
+* **release:** prevent incomplete releases ([#22](https://github.com/pedrotmr/git-bar/issues/22)) ([f455c7d](https://github.com/pedrotmr/git-bar/commit/f455c7d4ab5dfe61648e4e6a160fe45d58bb828a))
+
 ## [0.4.1](https://github.com/pedrotmr/git-bar/compare/v0.4.0...v0.4.1) (2026-10-30)
 
 
