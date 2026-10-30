@@ -13,11 +13,15 @@ final class UpdateService {
     private let managedByHomebrew: Bool
     private var hasStartedHomebrewUpdater = false
     private var backgroundCheckTask: Task<Void, Never>?
+    private var backgroundCheckInterval: TimeInterval?
+    private var probeSchedule = UpdateProbeSchedule()
+    @ObservationIgnored private var automaticChecksObservation: NSKeyValueObservation?
     var availableUpdateVersion: String?
 
     init() {
         let bundle = Bundle.main
         let bundleIdentifier = bundle.bundleIdentifier ?? "com.GitBar.app"
+        LegacyAutomaticChecksMigration.run(defaults: .standard, bundleIdentifier: bundleIdentifier)
         managedByHomebrew = HomebrewInstallDetector.isManagedByHomebrew(
             bundleIdentifier: bundleIdentifier,
             bundleURL: bundle.bundleURL
@@ -25,7 +29,7 @@ final class UpdateService {
 
         let userDriverDelegate = UpdaterUserDriverDelegate()
         self.userDriverDelegate = userDriverDelegate
-        let updaterDelegate = UpdaterDelegate(managedByHomebrew: managedByHomebrew)
+        let updaterDelegate = UpdaterDelegate()
         self.updaterDelegate = updaterDelegate
 
         if managedByHomebrew {
@@ -59,6 +63,10 @@ final class UpdateService {
         updaterDelegate.onUpdateUnavailable = { [weak self] in
             self?.availableUpdateVersion = nil
         }
+        updaterDelegate.onUpdateCheckFinished = { [weak self] updateCheck, error in
+            guard updateCheck == .updateInformation else { return }
+            self?.scheduleNextBackgroundCheck(after: error)
+        }
 
         startBackgroundUpdateChecks()
     }
@@ -89,58 +97,165 @@ final class UpdateService {
 
     private func startBackgroundUpdateChecks() {
         guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater else { return }
-        // Use silent information probes so update discovery can be surfaced in GitBar's UI.
-        updater.automaticallyChecksForUpdates = false
-        do {
-            try updater.start()
-            hasStartedHomebrewUpdater = managedByHomebrew
-            updater.checkForUpdateInformation()
-        } catch {
-            return
+
+        if managedByHomebrew {
+            do {
+                try updater.start()
+                hasStartedHomebrewUpdater = true
+            } catch {
+                homebrewUserDriver?.showUpdaterStartError(error)
+                return
+            }
+        } else {
+            controller?.startUpdater()
         }
 
-        let interval = max(updater.updateCheckInterval, 3_600)
-        backgroundCheckTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                do {
-                    try await Task.sleep(for: .seconds(interval))
-                } catch {
-                    return
-                }
-                self?.checkForUpdateInformation()
+        backgroundCheckInterval = max(updater.updateCheckInterval, 3_600)
+        automaticChecksObservation = updater.observe(\.automaticallyChecksForUpdates, options: [.new]) { [weak self] _, change in
+            guard let isEnabled = change.newValue else { return }
+            Task { @MainActor [weak self] in
+                self?.automaticChecksPreferenceDidChange(isEnabled)
             }
+        }
+
+        if updater.automaticallyChecksForUpdates {
+            checkForUpdateInformation()
+        }
+    }
+
+    private func automaticChecksPreferenceDidChange(_ isEnabled: Bool) {
+        guard backgroundCheckInterval != nil else { return }
+        if isEnabled {
+            checkForUpdateInformation()
+        } else {
+            stopBackgroundCheckSchedule()
+        }
+    }
+
+    private func scheduleNextBackgroundCheck(after error: Error?) {
+        guard let backgroundCheckInterval else { return }
+        guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater,
+              let delay = probeSchedule.nextInterval(
+                after: error,
+                normalInterval: backgroundCheckInterval,
+                automaticChecksEnabled: updater.automaticallyChecksForUpdates
+              ) else {
+            stopBackgroundCheckSchedule()
+            return
+        }
+        scheduleBackgroundCheck(after: delay)
+    }
+
+    private func scheduleBackgroundCheck(after delay: TimeInterval) {
+        guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater,
+              updater.automaticallyChecksForUpdates else {
+            stopBackgroundCheckSchedule()
+            return
+        }
+        backgroundCheckTask?.cancel()
+        backgroundCheckTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(delay))
+            } catch {
+                return
+            }
+            guard let self else { return }
+            self.checkForUpdateInformation()
         }
     }
 
     private func checkForUpdateInformation() {
         let updater = managedByHomebrew ? homebrewUpdater : controller?.updater
-        guard let updater, !updater.sessionInProgress else { return }
+        guard let updater else { return }
+        guard updater.automaticallyChecksForUpdates else {
+            stopBackgroundCheckSchedule()
+            return
+        }
+        guard !updater.sessionInProgress else {
+            scheduleBackgroundCheck(after: UpdateProbeSchedule.retryInterval)
+            return
+        }
         updater.checkForUpdateInformation()
+    }
+
+    private func stopBackgroundCheckSchedule() {
+        backgroundCheckTask?.cancel()
+        backgroundCheckTask = nil
+        probeSchedule = UpdateProbeSchedule()
     }
 }
 
-enum HomebrewUpdateCheckPolicy {
-    static func allows(_ updateCheck: SPUUpdateCheck, managedByHomebrew: Bool) -> Bool {
-        !managedByHomebrew || updateCheck != .updatesInBackground
+enum UpdateCheckPolicy {
+    static func allows(_ updateCheck: SPUUpdateCheck) -> Bool {
+        updateCheck != .updatesInBackground
+    }
+}
+
+struct UpdateProbeSchedule {
+    static let maximumRetries = 3
+    static let retryInterval: TimeInterval = 900
+
+    private(set) var consecutiveRetries = 0
+
+    mutating func nextInterval(
+        after error: Error?,
+        normalInterval: TimeInterval,
+        automaticChecksEnabled: Bool
+    ) -> TimeInterval? {
+        guard automaticChecksEnabled else {
+            consecutiveRetries = 0
+            return nil
+        }
+
+        guard let error, !Self.isNoUpdateError(error) else {
+            consecutiveRetries = 0
+            return normalInterval
+        }
+
+        guard consecutiveRetries < Self.maximumRetries else {
+            consecutiveRetries = 0
+            return normalInterval
+        }
+
+        consecutiveRetries += 1
+        return Self.retryInterval
+    }
+
+    private static func isNoUpdateError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == SUSparkleErrorDomain && nsError.code == Int(SUError.noUpdateError.rawValue)
+    }
+}
+
+enum LegacyAutomaticChecksMigration {
+    static let automaticChecksKey = "SUEnableAutomaticChecks"
+    static let migrationKey = "GitBar.DidMigrateForcedAutomaticChecks"
+
+    static func run(defaults: UserDefaults, bundleIdentifier: String) {
+        let appPreferences = defaults.persistentDomain(forName: bundleIdentifier) ?? [:]
+        guard appPreferences[migrationKey] as? Bool != true else { return }
+
+        // Older GitBar versions wrote false here unconditionally. Remove only that app-domain override once,
+        // allowing the bundle's enabled default to take effect. Later user choices remain untouched.
+        if appPreferences[automaticChecksKey] as? Bool == false {
+            defaults.removeObject(forKey: automaticChecksKey)
+        }
+        defaults.set(true, forKey: migrationKey)
     }
 }
 
 @MainActor
 private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
-    private let managedByHomebrew: Bool
     var onUpdateAvailable: ((SUAppcastItem) -> Void)?
     var onUpdateUnavailable: (() -> Void)?
-
-    init(managedByHomebrew: Bool) {
-        self.managedByHomebrew = managedByHomebrew
-    }
+    var onUpdateCheckFinished: ((SPUUpdateCheck, Error?) -> Void)?
 
     func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
-        guard HomebrewUpdateCheckPolicy.allows(updateCheck, managedByHomebrew: managedByHomebrew) else {
+        guard UpdateCheckPolicy.allows(updateCheck) else {
             throw NSError(
                 domain: "GitBar.UpdateService",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Scheduled update checks are disabled for Homebrew installations."]
+                userInfo: [NSLocalizedDescriptionKey: "Scheduled update checks are disabled."]
             )
         }
     }
@@ -151,6 +266,14 @@ private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
 
     func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
         onUpdateUnavailable?()
+    }
+
+    func updater(
+        _ updater: SPUUpdater,
+        didFinishUpdateCycleFor updateCheck: SPUUpdateCheck,
+        error: Error?
+    ) {
+        onUpdateCheckFinished?(updateCheck, error)
     }
 }
 
@@ -194,7 +317,7 @@ private final class HomebrewUserDriver: SPUStandardUserDriver {
                 return .dismiss
             case .alertSecondButtonReturn:
                 copyHomebrewCommand()
-                return .skip
+                return .dismiss
             default:
                 return cancellationChoice(for: state)
             }
@@ -211,7 +334,7 @@ private final class HomebrewUserDriver: SPUStandardUserDriver {
             return .install
         case .alertSecondButtonReturn:
             copyHomebrewCommand()
-            return .skip
+            return .dismiss
         default:
             return cancellationChoice(for: state)
         }

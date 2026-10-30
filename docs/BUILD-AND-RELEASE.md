@@ -55,7 +55,7 @@ GitHub gates signing jobs with the `signed-distribution` environment. Its deploy
 
 ## Updating and Homebrew
 
-Direct downloads use Sparkle's **Check for Updates…** command. Homebrew installs can use the same command to choose a Sparkle update or copy the Homebrew command when an update is available. To update only the Homebrew copy in Terminal, run:
+When Sparkle automatic checks are enabled, direct downloads and Homebrew installs check the feed quietly in the background and show an **Update to…** action only when an installable update is available. Direct downloads use the action to start a Sparkle update. Homebrew installs can choose an in-app update or copy the Homebrew command. To update only the Homebrew copy in Terminal, run:
 
 ```sh
 brew upgrade --cask pedrotmr/git-bar/pedrotmr-git-bar

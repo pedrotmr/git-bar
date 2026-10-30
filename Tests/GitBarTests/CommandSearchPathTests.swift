@@ -72,9 +72,74 @@ final class CommandSearchPathTests: XCTestCase {
         XCTAssertNil(UserDefaults(suiteName: bundleIdentifier)?.object(forKey: HomebrewInstallDetector.markerKey))
     }
 
-    func testHomebrewUpdateChecksAllowManualChecksButBlockScheduledChecks() {
-        XCTAssertTrue(HomebrewUpdateCheckPolicy.allows(.updates, managedByHomebrew: true))
-        XCTAssertFalse(HomebrewUpdateCheckPolicy.allows(.updatesInBackground, managedByHomebrew: true))
-        XCTAssertTrue(HomebrewUpdateCheckPolicy.allows(.updatesInBackground, managedByHomebrew: false))
+    func testUpdateCheckPolicyAllowsUserAndInformationChecksButBlocksScheduledChecks() {
+        XCTAssertTrue(UpdateCheckPolicy.allows(.updates))
+        XCTAssertTrue(UpdateCheckPolicy.allows(.updateInformation))
+        XCTAssertFalse(UpdateCheckPolicy.allows(.updatesInBackground))
+    }
+
+    func testUpdateProbeScheduleRetriesTransientFailuresAndThenReturnsToNormalInterval() {
+        var schedule = UpdateProbeSchedule()
+        let error = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
+
+        for _ in 0..<UpdateProbeSchedule.maximumRetries {
+            XCTAssertEqual(
+                schedule.nextInterval(after: error, normalInterval: 86_400, automaticChecksEnabled: true),
+                .some(UpdateProbeSchedule.retryInterval)
+            )
+        }
+
+        XCTAssertEqual(schedule.nextInterval(after: error, normalInterval: 86_400, automaticChecksEnabled: true), .some(86_400))
+        XCTAssertEqual(schedule.consecutiveRetries, 0)
+    }
+
+    func testNoUpdateIsACompletedProbeAndResetsRetryCount() {
+        var schedule = UpdateProbeSchedule()
+        let noUpdateError = NSError(domain: SUSparkleErrorDomain, code: Int(SUError.noUpdateError.rawValue))
+        let transientError = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
+        _ = schedule.nextInterval(after: transientError, normalInterval: 86_400, automaticChecksEnabled: true)
+
+        XCTAssertEqual(schedule.nextInterval(after: noUpdateError, normalInterval: 86_400, automaticChecksEnabled: true), .some(86_400))
+        XCTAssertEqual(schedule.consecutiveRetries, 0)
+    }
+
+    func testChangingAutomaticChecksOffStopsTheNextProbeAndTurningItBackOnResumes() {
+        var schedule = UpdateProbeSchedule()
+
+        XCTAssertEqual(
+            schedule.nextInterval(after: nil, normalInterval: 86_400, automaticChecksEnabled: true),
+            .some(86_400)
+        )
+        XCTAssertNil(schedule.nextInterval(after: nil, normalInterval: 86_400, automaticChecksEnabled: false))
+        XCTAssertEqual(schedule.consecutiveRetries, 0)
+        XCTAssertEqual(
+            schedule.nextInterval(after: nil, normalInterval: 86_400, automaticChecksEnabled: true),
+            .some(86_400)
+        )
+    }
+
+    func testLegacyForcedAutomaticChecksValueIsRemovedOnlyOnce() {
+        let bundleIdentifier = "com.example.GitBarTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: bundleIdentifier)!
+        defer { defaults.removePersistentDomain(forName: bundleIdentifier) }
+        defaults.set(false, forKey: LegacyAutomaticChecksMigration.automaticChecksKey)
+
+        LegacyAutomaticChecksMigration.run(defaults: defaults, bundleIdentifier: bundleIdentifier)
+
+        XCTAssertNil(defaults.persistentDomain(forName: bundleIdentifier)?[
+            LegacyAutomaticChecksMigration.automaticChecksKey
+        ])
+        XCTAssertEqual(
+            defaults.persistentDomain(forName: bundleIdentifier)?[LegacyAutomaticChecksMigration.migrationKey] as? Bool,
+            true
+        )
+
+        defaults.set(false, forKey: LegacyAutomaticChecksMigration.automaticChecksKey)
+        LegacyAutomaticChecksMigration.run(defaults: defaults, bundleIdentifier: bundleIdentifier)
+
+        XCTAssertEqual(
+            defaults.persistentDomain(forName: bundleIdentifier)?[LegacyAutomaticChecksMigration.automaticChecksKey] as? Bool,
+            false
+        )
     }
 }

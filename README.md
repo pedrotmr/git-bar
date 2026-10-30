@@ -35,7 +35,7 @@ Choose one installation method:
 brew install --cask pedrotmr/git-bar/pedrotmr-git-bar
 ```
 
-Homebrew manages updates for this copy. **Check for Updates…** offers an in-app Sparkle update or a Homebrew command only when an update is available. To update only GitBar in Terminal:
+Homebrew manages updates for this copy. When Sparkle automatic checks are enabled, GitBar checks quietly in the background and shows an **Update to…** action only when an installable update is available. Choose it to start a Sparkle update or copy the Homebrew command. To update only GitBar in Terminal:
 
 ```sh
 brew upgrade --cask pedrotmr/git-bar/pedrotmr-git-bar
@@ -47,7 +47,7 @@ brew upgrade --cask pedrotmr/git-bar/pedrotmr-git-bar
 2. If you downloaded the DMG, open it. If you downloaded the ZIP, extract it.
 3. Drag `GitBar.app` to your Applications folder.
 
-To update a direct download, choose **Check for Updates…** in the app. Version 0.2.0 was the first Sparkle release. For a predictable upgrade from v0.1.x, install the current release manually once.
+When Sparkle automatic checks are enabled, direct downloads check quietly in the background and show an **Update to…** action when Sparkle finds an installable update. Version 0.2.0 was the first Sparkle release. For a predictable upgrade from v0.1.x, install the current release manually once.
 
 ## 🚀 First launch
 
