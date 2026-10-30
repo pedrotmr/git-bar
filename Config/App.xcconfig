@@ -1,7 +1,7 @@
 // `make` supplies the Release Please version and release build number.
 #include "Project.xcconfig"
 // x-release-please-start-version
-APP_MARKETING_VERSION = 0.4.0
+APP_MARKETING_VERSION = 0.4.1
 // x-release-please-end
 APP_BUILD_NUMBER = 1
 
