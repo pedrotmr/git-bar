@@ -72,9 +72,31 @@ final class CommandSearchPathTests: XCTestCase {
         XCTAssertNil(UserDefaults(suiteName: bundleIdentifier)?.object(forKey: HomebrewInstallDetector.markerKey))
     }
 
-    func testHomebrewUpdateChecksAllowManualChecksButBlockScheduledChecks() {
-        XCTAssertTrue(HomebrewUpdateCheckPolicy.allows(.updates, managedByHomebrew: true))
-        XCTAssertFalse(HomebrewUpdateCheckPolicy.allows(.updatesInBackground, managedByHomebrew: true))
-        XCTAssertTrue(HomebrewUpdateCheckPolicy.allows(.updatesInBackground, managedByHomebrew: false))
+    func testUpdateCheckPolicyAllowsUserAndInformationChecksButBlocksScheduledChecks() {
+        XCTAssertTrue(UpdateCheckPolicy.allows(.updates))
+        XCTAssertTrue(UpdateCheckPolicy.allows(.updateInformation))
+        XCTAssertFalse(UpdateCheckPolicy.allows(.updatesInBackground))
+    }
+
+    func testUpdateProbeScheduleRetriesTransientFailuresAndThenReturnsToNormalInterval() {
+        var schedule = UpdateProbeSchedule()
+        let error = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
+
+        for _ in 0..<UpdateProbeSchedule.maximumRetries {
+            XCTAssertEqual(schedule.nextInterval(after: error, normalInterval: 86_400), UpdateProbeSchedule.retryInterval)
+        }
+
+        XCTAssertEqual(schedule.nextInterval(after: error, normalInterval: 86_400), 86_400)
+        XCTAssertEqual(schedule.consecutiveRetries, 0)
+    }
+
+    func testNoUpdateIsACompletedProbeAndResetsRetryCount() {
+        var schedule = UpdateProbeSchedule()
+        let noUpdateError = NSError(domain: SUSparkleErrorDomain, code: Int(SUError.noUpdateError.rawValue))
+        let transientError = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
+        _ = schedule.nextInterval(after: transientError, normalInterval: 86_400)
+
+        XCTAssertEqual(schedule.nextInterval(after: noUpdateError, normalInterval: 86_400), 86_400)
+        XCTAssertEqual(schedule.consecutiveRetries, 0)
     }
 }

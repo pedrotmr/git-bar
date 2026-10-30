@@ -15,7 +15,7 @@ The cask marks the app as Homebrew-managed and clears only that marker when remo
 
 The cask checks for macOS 14.6 or later before it installs GitBar. The app bundle and Sparkle feed carry the same minimum.
 
-On a Homebrew install, **Check for Updates…** checks the Sparkle feed. It stays quiet when there is no update. When an update is available, choose **Update in App** to install it with Sparkle or **Copy Homebrew Command** to use Homebrew in Terminal. If Sparkle cannot check or complete an update, its error alert offers the Homebrew command. In-app updates keep the Homebrew marker. The command below targets the version currently available in Homebrew's local tap, so use it after the tap contains the release you want.
+On a Homebrew install, GitBar checks the Sparkle feed quietly in the background when Sparkle automatic checks are enabled. When an installable update is available, an **Update to…** action appears. Choose it to install with Sparkle or copy the Homebrew command. If Sparkle cannot complete an update, its error alert offers the Homebrew command. Copying the command does not skip the release in Sparkle. In-app updates keep the Homebrew marker. The command below targets the version currently available in Homebrew's local tap, so use it after the tap contains the release you want.
 
 To update only this cask, run:
 
