@@ -2,6 +2,18 @@
 
 Releases are versioned with SemVer. Release notes for the next version are prepared in the release pull request.
 
+## [0.4.0](https://github.com/pedrotmr/git-bar/compare/v0.3.0...v0.4.0) (2026-10-30)
+
+
+### Features
+
+* add branch sync and background updates ([#19](https://github.com/pedrotmr/git-bar/issues/19)) ([3857c0d](https://github.com/pedrotmr/git-bar/commit/3857c0d729510e0f8ad6383f1c8b509aea1b3251))
+
+
+### Bug Fixes
+
+* simplify Homebrew upgrade command ([#17](https://github.com/pedrotmr/git-bar/issues/17)) ([b230f80](https://github.com/pedrotmr/git-bar/commit/b230f808c89a3d0edd33f85aa18f09e6ab3f62fa))
+
 ## [0.3.0](https://github.com/pedrotmr/git-bar/compare/v0.2.1...v0.3.0) (2026-10-29)
 
 
