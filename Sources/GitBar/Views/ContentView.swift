@@ -491,8 +491,10 @@ struct BottomBar: View {
             }
             .disabled(gitService.repoPath.isEmpty || gitService.isLoading)
 
-            IconButton(systemImage: "arrow.down.circle", tooltip: "Check for updates…") {
-                updateService.checkForUpdates()
+            if let version = updateService.availableUpdateVersion {
+                IconButton(systemImage: "arrow.down.circle.fill", tooltip: "Update to \(version)…") {
+                    updateService.installAvailableUpdate()
+                }
             }
 
             IconButton(systemImage: "gearshape", tooltip: "Settings") {

@@ -16,6 +16,7 @@ class SettingsService {
         "showWorktreeTab",
         "showPRTab",
         "autoFetchEnabled",
+        "confirmBranchDeletion",
         "tabOrder",
     ]
 
@@ -27,6 +28,7 @@ class SettingsService {
     private let showStashTabKey = "showStashTab"
     private let showWorktreeTabKey = "showWorktreeTab"
     private let autoFetchEnabledKey = "autoFetchEnabled"
+    private let confirmBranchDeletionKey = "confirmBranchDeletion"
     private let showPRTabKey = "showPRTab"
     private let tabOrderKey = "tabOrder"
 
@@ -50,6 +52,9 @@ class SettingsService {
     var autoFetchEnabled: Bool {
         didSet { UserDefaults.standard.set(autoFetchEnabled, forKey: autoFetchEnabledKey) }
     }
+    var confirmBranchDeletion: Bool {
+        didSet { UserDefaults.standard.set(confirmBranchDeletion, forKey: confirmBranchDeletionKey) }
+    }
     var showPRTab: Bool {
         didSet { UserDefaults.standard.set(showPRTab, forKey: showPRTabKey) }
     }
@@ -72,6 +77,7 @@ class SettingsService {
         showStashTab = UserDefaults.standard.object(forKey: showStashTabKey) as? Bool ?? true
         showWorktreeTab = UserDefaults.standard.object(forKey: showWorktreeTabKey) as? Bool ?? true
         autoFetchEnabled = UserDefaults.standard.bool(forKey: autoFetchEnabledKey)
+        confirmBranchDeletion = UserDefaults.standard.object(forKey: confirmBranchDeletionKey) as? Bool ?? true
         showPRTab = UserDefaults.standard.object(forKey: showPRTabKey) as? Bool ?? true
         let defaultOrder: [AppTab] = [.branches, .stashes, .worktrees, .pullRequests]
         let saved = (UserDefaults.standard.stringArray(forKey: tabOrderKey) ?? []).compactMap(AppTab.init(rawValue:))

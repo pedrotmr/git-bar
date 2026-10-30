@@ -3,6 +3,7 @@ import SwiftUI
 struct BranchRowView: View {
     let branch: Branch
     @Environment(GitService.self) private var gitService
+    @Environment(SettingsService.self) private var settingsService
     @State private var isHovered = false
     @State private var showDeleteConfirm = false
     @State private var showForceDeleteConfirm = false
@@ -16,26 +17,40 @@ struct BranchRowView: View {
                 .fill(branch.isCurrent ? Color.green : Color.secondary.opacity(0.25))
                 .frame(width: 7, height: 7)
 
-            Text(branch.name)
-                .font(.system(size: 13, weight: branch.isCurrent ? .medium : .regular))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
+            HStack(spacing: 8) {
+                Text(branch.name)
+                    .font(.system(size: 13, weight: branch.isCurrent ? .medium : .regular))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                if branch.ahead > 0 {
+                    trackingStatus(branch.ahead, symbol: "arrow.up", direction: "ahead of")
+                }
+                if branch.behind > 0 {
+                    trackingStatus(branch.behind, symbol: "arrow.down", direction: "behind")
+                }
+            }
 
             Spacer()
 
-            // Always reserve space; reveal on hover to avoid layout shift
+            // Keep row actions together and reveal them on hover.
             HStack(spacing: 2) {
-                HoverIconButton(systemImage: "arrow.trianglehead.swap", tooltip: "Switch to branch") {
-                    Task { await gitService.switchBranch(branch.name) }
-                }
-                .opacity(isHovered && !branch.isCurrent ? 1 : 0)
-                .disabled(branch.isCurrent)
+                if branch.isCurrent, let upstream = branch.upstream {
+                    HoverIconButton(systemImage: "arrow.down.circle", tooltip: "Fetch and pull from \(upstream)") {
+                        Task { await gitService.pullCurrentBranch() }
+                    }
+                    .opacity(isHovered ? 1 : 0)
+                } else if !branch.isCurrent {
+                    HoverIconButton(systemImage: "arrow.trianglehead.swap", tooltip: "Switch to branch") {
+                        Task { await gitService.switchBranch(branch.name) }
+                    }
+                    .opacity(isHovered ? 1 : 0)
 
-                HoverIconButton(systemImage: "trash", tooltip: "Delete branch") {
-                    showDeleteConfirm = true
+                    HoverIconButton(systemImage: "trash", tooltip: "Delete branch") {
+                        requestDelete()
+                    }
+                    .opacity(isHovered ? 1 : 0)
                 }
-                .opacity(isHovered && !branch.isCurrent ? 1 : 0)
-                .disabled(branch.isCurrent)
             }
         }
         .padding(.horizontal, 12)
@@ -55,15 +70,15 @@ struct BranchRowView: View {
             }
             Divider()
             Button("Delete", role: .destructive) {
-                showDeleteConfirm = true
+                requestDelete()
             }
             .disabled(branch.isCurrent)
             Button("Delete Local & Remote", role: .destructive) {
-                showDeleteBothConfirm = true
+                requestDeleteBoth()
             }
             .disabled(branch.isCurrent)
             Button("Force Delete", role: .destructive) {
-                showForceDeleteConfirm = true
+                requestForceDelete()
             }
             .disabled(branch.isCurrent)
         }
@@ -75,9 +90,7 @@ struct BranchRowView: View {
             Button("Delete", role: .destructive) {
                 Task {
                     await gitService.deleteBranch(branch.name)
-                    if gitService.errorMessage != nil {
-                        showUnmergedChangesDialog = true
-                    }
+                    showUnmergedDialogIfNeeded()
                 }
             }
             Button("Cancel", role: .cancel) {}
@@ -120,6 +133,59 @@ struct BranchRowView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("The branch \"\(branch.name)\" contains commits that haven't been merged. Force delete?")
+        }
+    }
+
+    private func trackingStatus(_ count: Int, symbol: String, direction: String) -> some View {
+        Label("\(count)", systemImage: symbol)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(.secondary)
+            .help("\(count) commit\(count == 1 ? "" : "s") \(direction) \(branch.upstream ?? "upstream")")
+    }
+
+    private func requestDelete() {
+        Task {
+            if await needsDeleteConfirmation() {
+                showDeleteConfirm = true
+            } else {
+                await deleteBranch()
+            }
+        }
+    }
+
+    private func requestForceDelete() {
+        Task {
+            if await needsDeleteConfirmation() {
+                showForceDeleteConfirm = true
+            } else {
+                await gitService.deleteBranch(branch.name, force: true)
+            }
+        }
+    }
+
+    private func requestDeleteBoth() {
+        Task {
+            if await needsDeleteConfirmation() {
+                showDeleteBothConfirm = true
+            } else {
+                await gitService.deleteLocalAndRemoteBranch(branch.name)
+            }
+        }
+    }
+
+    private func needsDeleteConfirmation() async -> Bool {
+        if settingsService.confirmBranchDeletion { return true }
+        return await gitService.branchHasUncommittedChanges(branch.name)
+    }
+
+    private func deleteBranch() async {
+        await gitService.deleteBranch(branch.name)
+        showUnmergedDialogIfNeeded()
+    }
+
+    private func showUnmergedDialogIfNeeded() {
+        if gitService.errorMessage != nil {
+            showUnmergedChangesDialog = true
         }
     }
 }

@@ -167,7 +167,7 @@ class GitService {
     }
 
     func fetchBranches() async {
-        let result = await runGit(["branch", "--format=%(refname:short) %(HEAD)"])
+        let result = await runGit(["branch", "--format=%(refname:short)%09%(HEAD)%09%(upstream:short)%09%(upstream:track,nobracket)"])
         guard result.exitCode == 0 else {
             appendError(result.stderr.trimmingCharacters(in: .whitespacesAndNewlines))
             return
@@ -175,11 +175,29 @@ class GitService {
         branches = result.stdout
             .split(separator: "\n")
             .compactMap { line -> Branch? in
-                let parts = line.split(separator: " ", maxSplits: 1)
-                guard let namePart = parts.first else { return nil }
-                let isCurrent = parts.count == 2 && parts[1] == "*"
-                return Branch(name: String(namePart), isCurrent: isCurrent)
+                let parts = line.split(separator: "\t", omittingEmptySubsequences: false)
+                guard let name = parts.first, !name.isEmpty else { return nil }
+                let isCurrent = parts.count > 1 && parts[1] == "*"
+                let tracking = parts.count > 3 ? String(parts[3]) : ""
+                let upstream = parts.count > 2 && !parts[2].isEmpty && tracking != "gone"
+                    ? String(parts[2])
+                    : nil
+                return Branch(
+                    name: String(name),
+                    isCurrent: isCurrent,
+                    upstream: upstream,
+                    ahead: Self.trackingCount("ahead", in: tracking),
+                    behind: Self.trackingCount("behind", in: tracking)
+                )
             }
+    }
+
+    private static func trackingCount(_ direction: String, in tracking: String) -> Int {
+        let pattern = "(?:^|, )\(direction) ([0-9]+)(?:$|, )"
+        guard let range = tracking.range(of: pattern, options: .regularExpression),
+              let numberRange = tracking[range].range(of: "[0-9]+", options: .regularExpression)
+        else { return 0 }
+        return Int(tracking[numberRange]) ?? 0
     }
 
     func fetchWorktrees() async {
@@ -412,10 +430,28 @@ class GitService {
         }
     }
 
+    func pullCurrentBranch() async {
+        guard !isMutating,
+              let currentBranch = branches.first(where: \.isCurrent),
+              currentBranch.upstream != nil
+        else { return }
+        isMutating = true
+        defer { isMutating = false }
+        errorMessage = nil
+        let result = await runGit(["pull", "--ff-only"])
+        if result.exitCode == 0 {
+            await refreshSilently()
+        } else {
+            let message = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            errorMessage = message.isEmpty ? "Could not pull updates (exit code \(result.exitCode))." : message
+        }
+    }
+
     func deleteBranch(_ name: String, force: Bool = false) async {
         guard !isMutating else { return }
         isMutating = true
         defer { isMutating = false }
+        errorMessage = nil
         let flag = force ? "-D" : "-d"
         let result = await runGit(["branch", flag, name])
         if result.exitCode == 0 {
@@ -430,6 +466,7 @@ class GitService {
         guard !isMutating else { return }
         isMutating = true
         defer { isMutating = false }
+        errorMessage = nil
         let remoteResult = await runGit(["push", "origin", "--delete", name])
         if remoteResult.exitCode != 0 {
             let remoteError = remoteResult.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -493,6 +530,11 @@ class GitService {
     func hasUncommittedChanges(_ path: String) async -> Bool {
         let result = await runGit(["status", "--porcelain"], at: path)
         return result.exitCode == 0 && !result.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    func branchHasUncommittedChanges(_ branchName: String) async -> Bool {
+        guard let worktree = worktrees.first(where: { $0.branch == branchName }) else { return false }
+        return await hasUncommittedChanges(worktree.path)
     }
 
     func isGitRepo(_ path: String) async -> Bool {

@@ -12,6 +12,8 @@ final class UpdateService {
     private let homebrewUserDriver: HomebrewUserDriver?
     private let managedByHomebrew: Bool
     private var hasStartedHomebrewUpdater = false
+    private var backgroundCheckTask: Task<Void, Never>?
+    var availableUpdateVersion: String?
 
     init() {
         let bundle = Bundle.main
@@ -45,11 +47,20 @@ final class UpdateService {
             homebrewUserDriver = nil
             homebrewUpdater = nil
             controller = SPUStandardUpdaterController(
-                startingUpdater: true,
+                startingUpdater: false,
                 updaterDelegate: updaterDelegate,
                 userDriverDelegate: userDriverDelegate
             )
         }
+
+        updaterDelegate.onUpdateAvailable = { [weak self] item in
+            self?.availableUpdateVersion = item.isInformationOnlyUpdate ? nil : item.displayVersionString
+        }
+        updaterDelegate.onUpdateUnavailable = { [weak self] in
+            self?.availableUpdateVersion = nil
+        }
+
+        startBackgroundUpdateChecks()
     }
 
     func checkForUpdates() {
@@ -71,6 +82,41 @@ final class UpdateService {
 
         updater.checkForUpdates()
     }
+
+    func installAvailableUpdate() {
+        checkForUpdates()
+    }
+
+    private func startBackgroundUpdateChecks() {
+        guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater else { return }
+        // Use silent information probes so update discovery can be surfaced in GitBar's UI.
+        updater.automaticallyChecksForUpdates = false
+        do {
+            try updater.start()
+            hasStartedHomebrewUpdater = managedByHomebrew
+            updater.checkForUpdateInformation()
+        } catch {
+            return
+        }
+
+        let interval = max(updater.updateCheckInterval, 3_600)
+        backgroundCheckTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(interval))
+                } catch {
+                    return
+                }
+                self?.checkForUpdateInformation()
+            }
+        }
+    }
+
+    private func checkForUpdateInformation() {
+        let updater = managedByHomebrew ? homebrewUpdater : controller?.updater
+        guard let updater, !updater.sessionInProgress else { return }
+        updater.checkForUpdateInformation()
+    }
 }
 
 enum HomebrewUpdateCheckPolicy {
@@ -82,6 +128,8 @@ enum HomebrewUpdateCheckPolicy {
 @MainActor
 private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
     private let managedByHomebrew: Bool
+    var onUpdateAvailable: ((SUAppcastItem) -> Void)?
+    var onUpdateUnavailable: (() -> Void)?
 
     init(managedByHomebrew: Bool) {
         self.managedByHomebrew = managedByHomebrew
@@ -95,6 +143,14 @@ private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
                 userInfo: [NSLocalizedDescriptionKey: "Scheduled update checks are disabled for Homebrew installations."]
             )
         }
+    }
+
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        onUpdateAvailable?(item)
+    }
+
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
+        onUpdateUnavailable?()
     }
 }
 
