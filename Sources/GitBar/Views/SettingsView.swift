@@ -18,21 +18,17 @@ struct SettingsView: View {
 
             Form {
                 Section("Tabs") {
-                    Toggle("Show branches", isOn: $settingsService.showBranchesTab)
+                    ForEach(AppTab.allCases) { tab in
+                        Toggle(
+                            "Show \(tab.settingsLabel)",
+                            isOn: Binding(
+                                get: { settingsService.isTabVisible(tab) },
+                                set: { settingsService.setTabVisible($0, for: tab) }
+                            )
+                        )
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-
-                    Toggle("Show stashes", isOn: $settingsService.showStashTab)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-
-                    Toggle("Show worktrees", isOn: $settingsService.showWorktreeTab)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-
-                    Toggle("Show pull requests", isOn: $settingsService.showPRTab)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                    }
                 }
 
                 Section("Git") {

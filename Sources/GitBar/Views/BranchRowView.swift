@@ -1,18 +1,49 @@
 import SwiftUI
 
 struct BranchRowView: View {
+    private enum DeletionAction {
+        case regular
+        case localAndRemote
+        case force
+
+        func title(for branchName: String) -> String {
+            switch self {
+            case .regular: "Delete branch \"\(branchName)\"?"
+            case .localAndRemote: "Delete \"\(branchName)\" locally and from remote?"
+            case .force: "Force delete branch \"\(branchName)\"?"
+            }
+        }
+
+        var buttonTitle: String {
+            switch self {
+            case .regular: "Delete"
+            case .localAndRemote: "Delete Local & Remote"
+            case .force: "Force Delete"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .regular:
+                "This cannot be undone."
+            case .localAndRemote:
+                "The local branch and its remote counterpart on origin will both be deleted. This cannot be undone."
+            case .force:
+                "The branch will be permanently deleted, even if it has unmerged changes. This cannot be undone."
+            }
+        }
+    }
+
     let branch: Branch
     @Environment(GitService.self) private var gitService
     @Environment(SettingsService.self) private var settingsService
     @State private var isHovered = false
-    @State private var showDeleteConfirm = false
-    @State private var showForceDeleteConfirm = false
+    @State private var pendingDeletion: DeletionAction?
     @State private var showUnmergedChangesDialog = false
     @State private var showDeleteBothConfirm = false
 
     var body: some View {
         HStack(spacing: 10) {
-            // Status dot
             Circle()
                 .fill(branch.isCurrent ? Color.green : Color.secondary.opacity(0.25))
                 .frame(width: 7, height: 7)
@@ -33,7 +64,6 @@ struct BranchRowView: View {
 
             Spacer()
 
-            // Keep row actions together and reveal them on hover.
             HStack(spacing: 2) {
                 if branch.isCurrent, let upstream = branch.upstream {
                     HoverIconButton(systemImage: "arrow.down.circle", tooltip: "Fetch and pull from \(upstream)") {
@@ -47,7 +77,7 @@ struct BranchRowView: View {
                     .opacity(isHovered ? 1 : 0)
 
                     HoverIconButton(systemImage: "trash", tooltip: "Delete branch") {
-                        requestDelete()
+                    requestDeletion(.regular)
                     }
                     .opacity(isHovered ? 1 : 0)
                 }
@@ -69,57 +99,38 @@ struct BranchRowView: View {
                 }
             }
             Divider()
-            Button("Delete", role: .destructive) {
-                requestDelete()
+                Button("Delete", role: .destructive) {
+                    requestDeletion(.regular)
             }
             .disabled(branch.isCurrent)
             Button("Delete Local & Remote", role: .destructive) {
-                requestDeleteBoth()
+                    requestDeletion(.localAndRemote)
             }
             .disabled(branch.isCurrent)
             Button("Force Delete", role: .destructive) {
-                requestForceDelete()
+                    requestDeletion(.force)
             }
             .disabled(branch.isCurrent)
         }
         .confirmationDialog(
-            "Delete branch \"\(branch.name)\"?",
-            isPresented: $showDeleteConfirm,
+            pendingDeletion?.title(for: branch.name) ?? "",
+            isPresented: Binding(
+                get: { pendingDeletion != nil },
+                set: { if !$0 { pendingDeletion = nil } }
+            ),
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) {
-                Task {
-                    await gitService.deleteBranch(branch.name)
-                    showUnmergedDialogIfNeeded()
+            if let pendingDeletion {
+                Button(pendingDeletion.buttonTitle, role: .destructive) {
+                    self.pendingDeletion = nil
+                    Task { await performDeletion(pendingDeletion) }
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Cancel", role: .cancel) { pendingDeletion = nil }
         } message: {
-            Text("This cannot be undone.")
-        }
-        .confirmationDialog(
-            "Delete \"\(branch.name)\" locally and from remote?",
-            isPresented: $showDeleteBothConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Delete Local & Remote", role: .destructive) {
-                Task { await gitService.deleteLocalAndRemoteBranch(branch.name) }
+            if let pendingDeletion {
+                Text(pendingDeletion.message)
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("The local branch and its remote counterpart on origin will both be deleted. This cannot be undone.")
-        }
-        .confirmationDialog(
-            "Force delete branch \"\(branch.name)\"?",
-            isPresented: $showForceDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Force Delete", role: .destructive) {
-                Task { await gitService.deleteBranch(branch.name, force: true) }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("The branch will be permanently deleted, even if it has unmerged changes. This cannot be undone.")
         }
         .confirmationDialog(
             "Branch has unmerged changes",
@@ -143,32 +154,12 @@ struct BranchRowView: View {
             .help("\(count) commit\(count == 1 ? "" : "s") \(direction) \(branch.upstream ?? "upstream")")
     }
 
-    private func requestDelete() {
+    private func requestDeletion(_ action: DeletionAction) {
         Task {
             if await needsDeleteConfirmation() {
-                showDeleteConfirm = true
+                pendingDeletion = action
             } else {
-                await deleteBranch()
-            }
-        }
-    }
-
-    private func requestForceDelete() {
-        Task {
-            if await needsDeleteConfirmation() {
-                showForceDeleteConfirm = true
-            } else {
-                await gitService.deleteBranch(branch.name, force: true)
-            }
-        }
-    }
-
-    private func requestDeleteBoth() {
-        Task {
-            if await needsDeleteConfirmation() {
-                showDeleteBothConfirm = true
-            } else {
-                await gitService.deleteLocalAndRemoteBranch(branch.name)
+                await performDeletion(action)
             }
         }
     }
@@ -178,9 +169,16 @@ struct BranchRowView: View {
         return await gitService.branchNeedsDeleteConfirmation(branch.name)
     }
 
-    private func deleteBranch() async {
-        await gitService.deleteBranch(branch.name)
-        showUnmergedDialogIfNeeded()
+    private func performDeletion(_ action: DeletionAction) async {
+        switch action {
+        case .regular:
+            await gitService.deleteBranch(branch.name)
+            showUnmergedDialogIfNeeded()
+        case .localAndRemote:
+            await gitService.deleteLocalAndRemoteBranch(branch.name)
+        case .force:
+            await gitService.deleteBranch(branch.name, force: true)
+        }
     }
 
     private func showUnmergedDialogIfNeeded() {
@@ -189,8 +187,6 @@ struct BranchRowView: View {
         }
     }
 }
-
-// MARK: - Shared hover components
 
 struct HoverIconButton: View {
     let systemImage: String

@@ -1,13 +1,34 @@
 import Foundation
 
-nonisolated struct ShellResult {
+nonisolated struct ShellResult: Sendable {
     let stdout: String
     let stderr: String
     let exitCode: Int32
+    let commandNotFound: Bool
+
+    init(stdout: String, stderr: String, exitCode: Int32, commandNotFound: Bool = false) {
+        self.stdout = stdout
+        self.stderr = stderr
+        self.exitCode = exitCode
+        self.commandNotFound = commandNotFound
+    }
 }
 
-nonisolated enum ShellError: Error {
-    case timeout
+nonisolated private final class ProcessOutputBuffer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = Data()
+
+    func store(_ data: Data) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.data = data
+    }
+
+    func load() -> Data {
+        lock.lock()
+        defer { lock.unlock() }
+        return data
+    }
 }
 
 nonisolated struct ShellExecutor {
@@ -42,11 +63,11 @@ nonisolated struct ShellExecutor {
             for: binary,
             path: environment["PATH"] ?? ""
         ) else {
-            let installHint = binary == "gh" ? " Install GitHub CLI with `brew install gh` and sign in with `gh auth login`." : ""
             return ShellResult(
                 stdout: "",
-                stderr: "Required command `\(binary)` was not found in GitBar's search path.\(installHint)",
-                exitCode: 127
+                stderr: "Required command `\(binary)` was not found in GitBar's search path.",
+                exitCode: 127,
+                commandNotFound: true
             )
         }
 
@@ -65,26 +86,24 @@ nonisolated struct ShellExecutor {
             process.standardOutput = stdoutPipe
             process.standardError = stderrPipe
 
-            // Collect pipe data asynchronously to avoid blocking
-            var stdoutData = Data()
-            var stderrData = Data()
+            let stdoutData = ProcessOutputBuffer()
+            let stderrData = ProcessOutputBuffer()
             let group = DispatchGroup()
 
             group.enter()
             DispatchQueue.global().async {
-                stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                stdoutData.store(stdoutPipe.fileHandleForReading.readDataToEndOfFile())
                 group.leave()
             }
             group.enter()
             DispatchQueue.global().async {
-                stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                stderrData.store(stderrPipe.fileHandleForReading.readDataToEndOfFile())
                 group.leave()
             }
 
             do {
                 try process.run()
             } catch {
-                // Drain pipes so the group completes
                 try? stdoutPipe.fileHandleForReading.close()
                 try? stderrPipe.fileHandleForReading.close()
                 group.wait()
@@ -92,7 +111,6 @@ nonisolated struct ShellExecutor {
                 return
             }
 
-            // Timeout watchdog
             let timeoutItem = DispatchWorkItem {
                 if process.isRunning { process.terminate() }
             }
@@ -103,12 +121,12 @@ nonisolated struct ShellExecutor {
                 group.wait()
 
                 let timedOut = terminatedProcess.terminationReason == .uncaughtSignal && terminatedProcess.terminationStatus == SIGTERM
-                let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
+                let stdout = String(data: stdoutData.load(), encoding: .utf8) ?? ""
                 let stderr: String
                 if timedOut {
                     stderr = "Process timed out after \(Int(timeout))s"
                 } else {
-                    stderr = String(data: stderrData, encoding: .utf8) ?? ""
+                    stderr = String(data: stderrData.load(), encoding: .utf8) ?? ""
                 }
 
                 continuation.resume(returning: ShellResult(

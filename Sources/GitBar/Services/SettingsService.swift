@@ -1,94 +1,87 @@
 import Foundation
 import Observation
-import SwiftUI
 
 @Observable
 class SettingsService {
-    private static let legacyBundleIdentifier = "pedrotmr.GitBar"
+    static let legacyBundleIdentifier = "pedrotmr.GitBar"
     static let legacyMigrationCompleteKey = "didMigrateLegacyPreferences"
-    private static let persistedKeys = [
-        "repoPaths_v2",
-        "selectedRepoPath_v2",
-        "preferredTerminal",
-        "preferredEditor",
-        "showBranchesTab",
-        "showStashTab",
-        "showWorktreeTab",
-        "showPRTab",
-        "autoFetchEnabled",
-        "confirmBranchDeletion",
-        "tabOrder",
-    ]
 
-    private let repoPathsKey = "repoPaths_v2"
-    private let selectedPathKey = "selectedRepoPath_v2"
-    private let preferredTerminalKey = "preferredTerminal"
-    private let preferredEditorKey = "preferredEditor"
-    private let showBranchesTabKey = "showBranchesTab"
-    private let showStashTabKey = "showStashTab"
-    private let showWorktreeTabKey = "showWorktreeTab"
-    private let autoFetchEnabledKey = "autoFetchEnabled"
-    private let confirmBranchDeletionKey = "confirmBranchDeletion"
-    private let showPRTabKey = "showPRTab"
-    private let tabOrderKey = "tabOrder"
+    private enum Keys {
+        static let repoPaths = "repoPaths_v2"
+        static let selectedRepoPath = "selectedRepoPath_v2"
+        static let preferredTerminal = "preferredTerminal"
+        static let preferredEditor = "preferredEditor"
+        static let autoFetchEnabled = "autoFetchEnabled"
+        static let confirmBranchDeletion = "confirmBranchDeletion"
+        static let tabOrder = "tabOrder"
+
+        static var persisted: [String] {
+            [
+                repoPaths,
+                selectedRepoPath,
+                preferredTerminal,
+                preferredEditor,
+                autoFetchEnabled,
+                confirmBranchDeletion,
+                tabOrder,
+            ] + AppTab.allCases.map(\.visibilityDefaultsKey)
+        }
+    }
+
+    @ObservationIgnored private let defaults: UserDefaults
 
     var repoPaths: [String]
     var selectedRepoPath: String?
     var preferredTerminal: SupportedTerminal {
-        didSet { UserDefaults.standard.set(preferredTerminal.rawValue, forKey: preferredTerminalKey) }
+        didSet { defaults.set(preferredTerminal.rawValue, forKey: Keys.preferredTerminal) }
     }
     var preferredEditor: SupportedEditor {
-        didSet { UserDefaults.standard.set(preferredEditor.rawValue, forKey: preferredEditorKey) }
+        didSet { defaults.set(preferredEditor.rawValue, forKey: Keys.preferredEditor) }
     }
-    var showBranchesTab: Bool {
-        didSet { UserDefaults.standard.set(showBranchesTab, forKey: showBranchesTabKey) }
-    }
-    var showStashTab: Bool {
-        didSet { UserDefaults.standard.set(showStashTab, forKey: showStashTabKey) }
-    }
-    var showWorktreeTab: Bool {
-        didSet { UserDefaults.standard.set(showWorktreeTab, forKey: showWorktreeTabKey) }
-    }
+    private(set) var tabVisibility: [AppTab: Bool]
     var autoFetchEnabled: Bool {
-        didSet { UserDefaults.standard.set(autoFetchEnabled, forKey: autoFetchEnabledKey) }
+        didSet { defaults.set(autoFetchEnabled, forKey: Keys.autoFetchEnabled) }
     }
     var confirmBranchDeletion: Bool {
-        didSet { UserDefaults.standard.set(confirmBranchDeletion, forKey: confirmBranchDeletionKey) }
-    }
-    var showPRTab: Bool {
-        didSet { UserDefaults.standard.set(showPRTab, forKey: showPRTabKey) }
+        didSet { defaults.set(confirmBranchDeletion, forKey: Keys.confirmBranchDeletion) }
     }
     var tabOrder: [AppTab] {
-        didSet { UserDefaults.standard.set(tabOrder.map(\.rawValue), forKey: tabOrderKey) }
+        didSet { defaults.set(tabOrder.map(\.rawValue), forKey: Keys.tabOrder) }
     }
 
-    init() {
-        Self.migrateLegacyPreferences(
-            from: UserDefaults(suiteName: Self.legacyBundleIdentifier),
-            to: .standard
-        )
-        repoPaths = UserDefaults.standard.stringArray(forKey: repoPathsKey) ?? []
-        selectedRepoPath = UserDefaults.standard.string(forKey: selectedPathKey)
-        let terminalRaw = UserDefaults.standard.string(forKey: preferredTerminalKey) ?? ""
-        preferredTerminal = SupportedTerminal(rawValue: terminalRaw) ?? .terminal
-        let editorRaw = UserDefaults.standard.string(forKey: preferredEditorKey) ?? ""
-        preferredEditor = SupportedEditor(rawValue: editorRaw) ?? .vscode
-        showBranchesTab = UserDefaults.standard.object(forKey: showBranchesTabKey) as? Bool ?? true
-        showStashTab = UserDefaults.standard.object(forKey: showStashTabKey) as? Bool ?? true
-        showWorktreeTab = UserDefaults.standard.object(forKey: showWorktreeTabKey) as? Bool ?? true
-        autoFetchEnabled = UserDefaults.standard.bool(forKey: autoFetchEnabledKey)
-        confirmBranchDeletion = UserDefaults.standard.object(forKey: confirmBranchDeletionKey) as? Bool ?? true
-        showPRTab = UserDefaults.standard.object(forKey: showPRTabKey) as? Bool ?? true
-        let defaultOrder: [AppTab] = [.branches, .stashes, .worktrees, .pullRequests]
-        let saved = (UserDefaults.standard.stringArray(forKey: tabOrderKey) ?? []).compactMap(AppTab.init(rawValue:))
-        let missing = defaultOrder.filter { !saved.contains($0) }
-        tabOrder = saved.isEmpty ? defaultOrder : saved + missing
+    init(
+        defaults: UserDefaults = .standard,
+        legacyDefaults: UserDefaults? = UserDefaults(suiteName: SettingsService.legacyBundleIdentifier)
+    ) {
+        self.defaults = defaults
+        Self.migrateLegacyPreferences(from: legacyDefaults, to: defaults)
+
+        repoPaths = defaults.stringArray(forKey: Keys.repoPaths) ?? []
+        selectedRepoPath = defaults.string(forKey: Keys.selectedRepoPath)
+        preferredTerminal = SupportedTerminal(
+            rawValue: defaults.string(forKey: Keys.preferredTerminal) ?? ""
+        ) ?? .terminal
+        preferredEditor = SupportedEditor(
+            rawValue: defaults.string(forKey: Keys.preferredEditor) ?? ""
+        ) ?? .vscode
+        tabVisibility = Dictionary(uniqueKeysWithValues: AppTab.allCases.map { tab in
+            (
+                tab,
+                defaults.object(forKey: tab.visibilityDefaultsKey) as? Bool ?? tab.isVisibleByDefault
+            )
+        })
+        autoFetchEnabled = defaults.bool(forKey: Keys.autoFetchEnabled)
+        confirmBranchDeletion = defaults.object(forKey: Keys.confirmBranchDeletion) as? Bool ?? true
+
+        let saved = (defaults.stringArray(forKey: Keys.tabOrder) ?? []).compactMap(AppTab.init(rawValue:))
+        let missing = AppTab.defaultOrder.filter { !saved.contains($0) }
+        tabOrder = saved.isEmpty ? AppTab.defaultOrder : saved + missing
     }
 
     static func migrateLegacyPreferences(from legacy: UserDefaults?, to current: UserDefaults) {
         guard !current.bool(forKey: legacyMigrationCompleteKey) else { return }
         if let legacy {
-            for key in persistedKeys where current.object(forKey: key) == nil {
+            for key in Keys.persisted where current.object(forKey: key) == nil {
                 if let value = legacy.object(forKey: key) {
                     current.set(value, forKey: key)
                 }
@@ -97,41 +90,64 @@ class SettingsService {
         current.set(true, forKey: legacyMigrationCompleteKey)
     }
 
+    func isTabVisible(_ tab: AppTab) -> Bool {
+        tabVisibility[tab] ?? tab.isVisibleByDefault
+    }
+
+    func setTabVisible(_ isVisible: Bool, for tab: AppTab) {
+        guard tabVisibility[tab] != isVisible else { return }
+        tabVisibility[tab] = isVisible
+        defaults.set(isVisible, forKey: tab.visibilityDefaultsKey)
+    }
+
     func addRepo(_ path: String) {
         if !repoPaths.contains(path) {
             repoPaths.append(path)
-            UserDefaults.standard.set(repoPaths, forKey: repoPathsKey)
+            defaults.set(repoPaths, forKey: Keys.repoPaths)
         }
         selectedRepoPath = path
-        UserDefaults.standard.set(path, forKey: selectedPathKey)
+        defaults.set(path, forKey: Keys.selectedRepoPath)
     }
 
     func removeRepo(_ path: String) {
         repoPaths.removeAll { $0 == path }
-        UserDefaults.standard.set(repoPaths, forKey: repoPathsKey)
+        defaults.set(repoPaths, forKey: Keys.repoPaths)
         if selectedRepoPath == path {
             selectedRepoPath = repoPaths.first
-            UserDefaults.standard.set(selectedRepoPath, forKey: selectedPathKey)
+            defaults.set(selectedRepoPath, forKey: Keys.selectedRepoPath)
         }
     }
 
     func moveRepo(fromOffsets source: IndexSet, toOffset destination: Int) {
-        repoPaths.move(fromOffsets: source, toOffset: destination)
-        UserDefaults.standard.set(repoPaths, forKey: repoPathsKey)
+        repoPaths = Self.moving(repoPaths, from: source, to: destination)
+        defaults.set(repoPaths, forKey: Keys.repoPaths)
     }
 
-    func moveTab(from sourceRaw: String, onto targetRaw: String) {
-        guard let from = AppTab(rawValue: sourceRaw),
-              let to = AppTab(rawValue: targetRaw),
-              from != to,
-              let fromIndex = tabOrder.firstIndex(of: from),
-              let toIndex = tabOrder.firstIndex(of: to)
+    func moveTab(from source: AppTab, onto target: AppTab) {
+        guard source != target,
+              let fromIndex = tabOrder.firstIndex(of: source),
+              let toIndex = tabOrder.firstIndex(of: target)
         else { return }
-        tabOrder.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+        tabOrder = Self.moving(
+            tabOrder,
+            from: IndexSet(integer: fromIndex),
+            to: toIndex > fromIndex ? toIndex + 1 : toIndex
+        )
     }
 
     func selectRepo(_ path: String) {
         selectedRepoPath = path
-        UserDefaults.standard.set(path, forKey: selectedPathKey)
+        defaults.set(path, forKey: Keys.selectedRepoPath)
+    }
+
+    private static func moving<Element>(_ values: [Element], from offsets: IndexSet, to destination: Int) -> [Element] {
+        let elements = offsets.sorted().map { values[$0] }
+        var result = values
+        for index in offsets.sorted(by: >) {
+            result.remove(at: index)
+        }
+        let adjustedDestination = destination - offsets.filter { $0 < destination }.count
+        result.insert(contentsOf: elements, at: adjustedDestination)
+        return result
     }
 }

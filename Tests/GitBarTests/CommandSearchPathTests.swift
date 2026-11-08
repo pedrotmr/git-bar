@@ -23,12 +23,23 @@ final class CommandSearchPathTests: XCTestCase {
         XCTAssertEqual(entries.last, "/custom/bin")
     }
 
-    func testFindsSystemGitAndLeavesMissingGitHubCLIActionable() throws {
+    func testFinderPathFindsGitAndGitHubServiceExplainsMissingCLI() async throws {
         let path = CommandSearchPath.augmentedPath(existingPath: nil, homeDirectory: "/Users/example")
 
         let gitPath = try XCTUnwrap(CommandSearchPath.executablePath(for: "git", path: path))
         XCTAssertTrue(FileManager.default.isExecutableFile(atPath: gitPath))
-        XCTAssertNil(CommandSearchPath.executablePath(for: "gh", path: "/empty"))
+
+        let missingCLI = await ShellExecutor.run(
+            "gh",
+            ["auth", "status"],
+            environmentOverrides: ["PATH": "/empty"]
+        )
+        XCTAssertEqual(missingCLI.exitCode, 127)
+        XCTAssertTrue(missingCLI.stderr.contains("Required command `gh` was not found"))
+
+        let actionableMessage = GitHubPullRequestService.actionableCLIMessage(for: missingCLI)
+        XCTAssertTrue(actionableMessage.contains("brew install gh"))
+        XCTAssertTrue(actionableMessage.contains("gh auth login"))
     }
 
     func testFindsAnExecutableInTheConfiguredPath() throws {

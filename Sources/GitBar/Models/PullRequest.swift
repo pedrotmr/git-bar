@@ -1,8 +1,8 @@
 import Foundation
 
-enum PRCategory { case created, assigned, reviewRequested }
+nonisolated enum PRCategory: Sendable { case created, assigned, reviewRequested }
 
-struct PullRequest: Identifiable, Hashable {
+nonisolated struct PullRequest: Identifiable, Hashable, Sendable {
     var id: Int { number }
     let number: Int
     let title: String

@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class BranchWorktreeStatusTests: XCTestCase {
-    func testDetectsUncommittedChangesForMatchingWorktreeBranch() async throws {
+    func testDetectsUncommittedChangesForWorktreePath() async throws {
         let path = FileManager.default.temporaryDirectory
             .appendingPathComponent("GitBarTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
@@ -13,25 +13,13 @@ final class BranchWorktreeStatusTests: XCTestCase {
         try runGit(["init"], at: path)
 
         let service = GitService()
-        service.worktrees = [Worktree(
-            path: path.path,
-            branch: "feature",
-            commitHash: nil,
-            isBare: false,
-            isMain: true
-        )]
-
-        let cleanFeature = await service.branchHasUncommittedChanges("feature")
-        let cleanOther = await service.branchHasUncommittedChanges("other")
-        XCTAssertFalse(cleanFeature)
-        XCTAssertFalse(cleanOther)
+        let clean = await service.hasUncommittedChanges(path.path)
+        XCTAssertFalse(clean)
 
         try Data("local edits".utf8).write(to: path.appendingPathComponent("notes.txt"))
 
-        let dirtyFeature = await service.branchHasUncommittedChanges("feature")
-        let dirtyOther = await service.branchHasUncommittedChanges("other")
-        XCTAssertTrue(dirtyFeature)
-        XCTAssertFalse(dirtyOther)
+        let dirty = await service.hasUncommittedChanges(path.path)
+        XCTAssertTrue(dirty)
     }
 
     func testRequiresDeleteConfirmationWhenWorktreeStatusIsUnavailable() async throws {
@@ -49,9 +37,7 @@ final class BranchWorktreeStatusTests: XCTestCase {
             isMain: true
         )]
 
-        let hasChanges = await service.branchHasUncommittedChanges("feature")
         let needsConfirmation = await service.branchNeedsDeleteConfirmation("feature")
-        XCTAssertFalse(hasChanges)
         XCTAssertTrue(needsConfirmation)
     }
 

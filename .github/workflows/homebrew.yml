@@ -62,9 +62,8 @@ jobs:
             echo "RELEASE_VERSION=$version"
             echo "RELEASE_OWNER=$(sed -n 's/^RELEASE_OWNER = //p' Config/App.xcconfig)"
             echo "RELEASE_SLUG=$(sed -n 's/^RELEASE_SLUG = //p' Config/App.xcconfig)"
-            echo "APP_BUNDLE_ID=$(sed -n 's/^PRODUCT_BUNDLE_IDENTIFIER = //p' Config/App.xcconfig)"
             echo "APP_NAME=$(sed -n 's/^PRODUCT_NAME = //p' Config/App.xcconfig)"
-            echo "APP_MIN_SYSTEM_VERSION=$(sed -n 's/^MACOSX_DEPLOYMENT_TARGET = //p' Config/Project.xcconfig)"
+            echo "CASK_TOKEN=$(sed -n 's/^HOMEBREW_CASK_TOKEN = //p' Config/App.xcconfig | sed -E 's/[[:space:]]+\/\/.*$//')"
           } >> "$GITHUB_ENV"
 
       - name: Build Sparkle verification tools
@@ -103,28 +102,19 @@ jobs:
           python3 scripts/update-cask.py \
             --tap-dir tap \
             --version "$VERSION" \
-            --sha256 "$SHA256" \
-            --owner "$RELEASE_OWNER" \
-            --slug "$RELEASE_SLUG" \
-            --cask-token "pedrotmr-git-bar" \
-            --bundle-id "$APP_BUNDLE_ID" \
-            --app-name "$APP_NAME" \
-            --app-display-name "GitBar" \
-            --description "Manage Git branches, worktrees, stashes, and pull requests" \
-            --min-macos "$APP_MIN_SYSTEM_VERSION" \
-            --sparkle "yes"
+            --sha256 "$SHA256"
           cd tap
           tap_name="pedrotmr/git-bar"
           brew tap --custom-remote "$tap_name" "file://$PWD"
           tap_dir=$(brew --repository "$tap_name")
           mkdir -p "$tap_dir/Casks"
-          cp "Casks/pedrotmr-git-bar.rb" "$tap_dir/Casks/pedrotmr-git-bar.rb"
-          brew trust --cask "$tap_name/pedrotmr-git-bar"
-          brew style --cask "$tap_name/pedrotmr-git-bar"
-          brew audit --cask --strict --online "$tap_name/pedrotmr-git-bar"
+          cp "Casks/$CASK_TOKEN.rb" "$tap_dir/Casks/$CASK_TOKEN.rb"
+          brew trust --cask "$tap_name/$CASK_TOKEN"
+          brew style --cask "$tap_name/$CASK_TOKEN"
+          brew audit --cask --strict --online "$tap_name/$CASK_TOKEN"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "Casks/pedrotmr-git-bar.rb"
+          git add "Casks/$CASK_TOKEN.rb"
           if ! git diff --cached --quiet; then
             git commit -m "Update GitBar to $VERSION"
             echo "updated=true" >> "$GITHUB_OUTPUT"

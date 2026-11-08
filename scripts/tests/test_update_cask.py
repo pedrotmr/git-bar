@@ -2,6 +2,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import shutil
 from pathlib import Path
 
 
@@ -10,31 +11,33 @@ SCRIPT = ROOT / "scripts" / "update-cask.py"
 
 
 class UpdateCaskTests(unittest.TestCase):
-    def test_minor_version_preflight_rejects_older_macos(self):
-        for current_version, accepted in (("14.5", False), ("14.6", True), ("15.0", True)):
-            with self.subTest(current_version=current_version):
-                result = subprocess.run(
-                    [
-                        "/usr/bin/osascript",
-                        "-e",
-                        f'set osVersion to "{current_version}"',
-                        "-e",
-                        "considering numeric strings",
-                        "-e",
-                        'if osVersion < "14.6" then error "Requires macOS 14.6 or later." number 1',
-                        "-e",
-                        "end considering",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                self.assertEqual(result.returncode == 0, accepted, result.stderr)
-
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.tap_dir = Path(self.temp_dir.name) / "tap"
-        self.cask_path = self.tap_dir / "Casks" / "demo-app.rb"
+        self.project_dir = Path(self.temp_dir.name) / "project"
+        self.tap_dir = self.project_dir / "tap"
+        self.script = self.project_dir / "scripts" / "update-cask.py"
+        (self.project_dir / "Config").mkdir(parents=True)
+        self.script.parent.mkdir(parents=True)
+        for config_name in ("App.xcconfig", "Project.xcconfig"):
+            shutil.copy2(ROOT / "Config" / config_name, self.project_dir / "Config" / config_name)
+        app_config = self.project_dir / "Config/App.xcconfig"
+        app_contents = app_config.read_text(encoding="utf-8")
+        app_contents = app_contents.replace(
+            "APP_DESCRIPTION = Manage Git branches, worktrees, stashes, and pull requests",
+            "APP_DESCRIPTION = Manage Git branches, worktrees, stashes, and pull requests // cask description",
+        ).replace("HOMEBREW_CASK_TOKEN = pedrotmr-git-bar", "HOMEBREW_CASK_TOKEN = pedrotmr-git-bar // cask file name")
+        app_contents = app_contents.replace("SPARKLE_ENABLED = YES", "SPARKLE_ENABLED = YES // optional update module")
+        app_config.write_text(app_contents, encoding="utf-8")
+        project_config = self.project_dir / "Config/Project.xcconfig"
+        project_config.write_text(
+            project_config.read_text(encoding="utf-8").replace(
+                "MACOSX_DEPLOYMENT_TARGET = 14.6",
+                "MACOSX_DEPLOYMENT_TARGET = 14.6 // minimum supported OS",
+            ),
+            encoding="utf-8",
+        )
+        shutil.copy2(SCRIPT, self.script)
+        self.cask_path = self.tap_dir / "Casks" / "pedrotmr-git-bar.rb"
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -43,31 +46,13 @@ class UpdateCaskTests(unittest.TestCase):
         return subprocess.run(
             [
                 sys.executable,
-                str(SCRIPT),
+                str(self.script),
                 "--tap-dir",
                 str(self.tap_dir),
                 "--version",
                 version,
                 "--sha256",
                 sha256,
-                "--owner",
-                "example",
-                "--slug",
-                "demo-app",
-                "--cask-token",
-                "demo-app",
-                "--bundle-id",
-                "com.example.Demo",
-                "--app-name",
-                "Demo",
-                "--app-display-name",
-                "Demo",
-                "--description",
-                "Manage demo workspaces...",
-                "--min-macos",
-                "14.6",
-                "--sparkle",
-                "yes",
             ],
             capture_output=True,
             text=True,
@@ -84,14 +69,14 @@ class UpdateCaskTests(unittest.TestCase):
         self.assertIn(f'sha256 "{checksum}"', content)
         self.assertIn("auto_updates true", content)
         self.assertIn("depends_on macos: :sonoma", content)
-        self.assertIn('desc "Manage demo workspaces"', content)
+        self.assertIn('desc "Manage Git branches, worktrees, stashes, and pull requests"', content)
         self.assertNotIn("verified:", content)
         self.assertIn("preflight_steps do", content)
         self.assertIn('if osVersion < \\"14.6\\" then error', content)
-        self.assertIn('"managedByHomebrewBundlePath",\n          "-string",\n          "{{appdir}}/Demo.app"', content)
+        self.assertIn('"managedByHomebrewBundlePath",\n          "-string",\n          "{{appdir}}/GitBar.app"', content)
         self.assertNotIn("#{appdir}", content)
         self.assertIn(
-            '"delete",\n          "com.example.Demo.homebrew",\n          "managedByHomebrewBundlePath"',
+            '"delete",\n          "com.GitBar.app.homebrew",\n          "managedByHomebrewBundlePath"',
             content,
         )
         self.assertNotIn("preflight do", content)

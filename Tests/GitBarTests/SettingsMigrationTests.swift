@@ -53,6 +53,37 @@ final class SettingsMigrationTests: XCTestCase {
         XCTAssertTrue(current.defaults.bool(forKey: SettingsService.legacyMigrationCompleteKey))
     }
 
+    func testTabVisibilityPersistsUsingTheExistingPreferenceKey() {
+        let store = defaults()
+        defer { removeDomain(for: store) }
+
+        let settings = SettingsService(defaults: store.defaults, legacyDefaults: nil)
+        XCTAssertTrue(settings.isTabVisible(.branches))
+
+        settings.setTabVisible(false, for: .branches)
+
+        XCTAssertEqual(store.defaults.object(forKey: "showBranchesTab") as? Bool, false)
+        XCTAssertFalse(SettingsService(defaults: store.defaults, legacyDefaults: nil).isTabVisible(.branches))
+    }
+
+    func testRepositoryAndTabReorderingPersistTheirCurrentOrder() {
+        let store = defaults()
+        defer { removeDomain(for: store) }
+
+        let settings = SettingsService(defaults: store.defaults, legacyDefaults: nil)
+        settings.addRepo("/tmp/first")
+        settings.addRepo("/tmp/second")
+        settings.addRepo("/tmp/third")
+        settings.moveRepo(fromOffsets: IndexSet(integer: 0), toOffset: 3)
+        settings.moveTab(from: .branches, onto: .pullRequests)
+
+        XCTAssertEqual(store.defaults.stringArray(forKey: "repoPaths_v2"), ["/tmp/second", "/tmp/third", "/tmp/first"])
+        XCTAssertEqual(
+            store.defaults.stringArray(forKey: "tabOrder"),
+            ["stashes", "worktrees", "pullRequests", "branches"]
+        )
+    }
+
     private func defaults() -> (domain: String, defaults: UserDefaults) {
         let domain = "com.example.GitBarTests.\(UUID().uuidString)"
         return (domain, UserDefaults(suiteName: domain)!)

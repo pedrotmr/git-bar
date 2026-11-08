@@ -1,6 +1,6 @@
 import Foundation
 
-struct Worktree: Identifiable, Hashable {
+nonisolated struct Worktree: Identifiable, Hashable, Sendable {
     var id: String { path }
     let path: String
     let branch: String?

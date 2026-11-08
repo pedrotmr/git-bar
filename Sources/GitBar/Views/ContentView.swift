@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
@@ -8,8 +8,8 @@ struct ContentView: View {
     @State private var selectedTab: AppTab = .branches
     @State private var showRepoList = false
     @State private var showSettings = false
-    @State private var draggingTab: AppTab? = nil
-    @State private var dropTargetTab: AppTab? = nil
+    @State private var draggingTab: AppTab?
+    @State private var dropTargetTab: AppTab?
 
     var body: some View {
         ZStack {
@@ -30,79 +30,53 @@ struct ContentView: View {
         .animation(.spring(duration: 0.28, bounce: 0.05), value: showRepoList)
         .animation(.spring(duration: 0.28, bounce: 0.05), value: showSettings)
         .frame(width: 440, height: 500)
-        .onChange(of: settingsService.selectedRepoPath) { _, newPath in
-            if let path = newPath {
-                gitService.repoPath = path
-                gitService.isDirty = true
-                if gitService.isPopoverVisible {
-                    Task { await gitService.refreshAfterRepoSelection() }
-                }
-            } else {
-                gitService.repoPath = ""
-                gitService.branches = []
-                gitService.worktrees = []
-                gitService.stashes = []
-                gitService.pullRequests = []
-                gitService.errorMessage = nil
+        .onChange(of: settingsService.selectedRepoPath) { _, path in
+            gitService.selectRepository(path)
+            guard path != nil else { return }
+            if gitService.isPopoverVisible {
+                Task { await gitService.refreshAfterRepoSelection() }
             }
         }
-        .onChange(of: settingsService.showBranchesTab) { _, isEnabled in
-            if !isEnabled && selectedTab == .branches { selectFirstVisibleTab() }
+        .onChange(of: settingsService.tabVisibility) { _, _ in
+            if !settingsService.isTabVisible(selectedTab) { selectFirstVisibleTab() }
         }
-        .onChange(of: settingsService.showWorktreeTab) { _, isEnabled in
-            if !isEnabled && selectedTab == .worktrees { selectFirstVisibleTab() }
-        }
-        .onChange(of: settingsService.showStashTab) { _, isEnabled in
-            if !isEnabled && selectedTab == .stashes { selectFirstVisibleTab() }
-        }
-        .onChange(of: settingsService.autoFetchEnabled) { _, newValue in
-            gitService.autoFetchEnabled = newValue
-        }
-        .onChange(of: settingsService.showPRTab) { _, isEnabled in
-            if !isEnabled && selectedTab == .pullRequests { selectFirstVisibleTab() }
+        .onChange(of: settingsService.autoFetchEnabled) { _, enabled in
+            gitService.autoFetchEnabled = enabled
         }
     }
-
-    // MARK: - Main View
 
     private var mainView: some View {
         VStack(spacing: 0) {
             repoHeader
-
             Divider().opacity(0.5)
 
             if gitService.repoPath.isEmpty {
                 emptyState
             } else {
-                if let error = gitService.errorMessage {
-                    errorBanner(error)
-                }
+                if let error = gitService.errorMessage { errorBanner(error) }
                 if hasVisibleTabs {
                     tabBar
                     Divider().opacity(0.5)
-                    // P2: Only render the active tab instead of all 4 via ZStack+opacity
-                    switch selectedTab {
-                    case .branches:
-                        BranchesView()
-                    case .worktrees:
-                        WorktreesView()
-                    case .stashes:
-                        StashesView()
-                    case .pullRequests:
-                        PullRequestsView()
-                    }
+                    selectedTabView
                 } else {
-                    allTabsHiddenState
+                    AllTabsHiddenView()
                 }
             }
 
             Divider().opacity(0.5)
-            bottomBar
+            BottomBar(onSettings: { withAnimation { showSettings = true } })
         }
         .frame(width: 440, height: 500)
     }
 
-    // MARK: - Repo Header
+    @ViewBuilder private var selectedTabView: some View {
+        switch selectedTab {
+        case .branches: BranchesView()
+        case .worktrees: WorktreesView()
+        case .stashes: StashesView()
+        case .pullRequests: PullRequestsView()
+        }
+    }
 
     private var repoHeader: some View {
         HStack {
@@ -143,26 +117,22 @@ struct ContentView: View {
             .contentShape(Rectangle())
             .onTapGesture { withAnimation { showRepoList = true } }
 
-            IconButton(systemImage: "plus", tooltip: "Add repository") {
-                addRepo()
-            }
+            IconButton(systemImage: "plus", tooltip: "Add repository", action: addRepo)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .frame(height: 58)
     }
 
-    // MARK: - Tab Bar
-
     private var tabBar: some View {
         HStack(spacing: 0) {
-            ForEach(settingsService.tabOrder, id: \.self) { tab in
-                if isTabVisible(tab) {
-                    TabButton(title: tabTitle(tab), count: tabCount(tab), tab: tab, selected: selectedTab) {
+            ForEach(settingsService.tabOrder) { tab in
+                if settingsService.isTabVisible(tab) {
+                    TabButton(title: tab.title, count: tabCount(tab), tab: tab, selected: selectedTab) {
                         withAnimation(.easeInOut(duration: 0.15)) { selectedTab = tab }
                     }
-                    .opacity(draggingTab == tab ? 0.4 : 1.0)
-                    .background(dropTargetTab == tab && draggingTab != tab ? Color.accentColor.opacity(0.1) : Color.clear)
+                    .opacity(draggingTab == tab ? 0.4 : 1)
+                    .background(dropTargetTab == tab && draggingTab != tab ? Color.accentColor.opacity(0.1) : .clear)
                     .onDrag {
                         draggingTab = tab
                         return NSItemProvider(object: tab.rawValue as NSString)
@@ -178,9 +148,11 @@ struct ContentView: View {
                         )
                     ) { providers in
                         providers.first?.loadObject(ofClass: NSString.self) { item, _ in
-                            guard let src = item as? String else { return }
+                            guard let rawValue = item as? String else { return }
                             DispatchQueue.main.async {
-                                settingsService.moveTab(from: src, onto: tab.rawValue)
+                                if let source = AppTab(rawValue: rawValue) {
+                                    settingsService.moveTab(from: source, onto: tab)
+                                }
                                 draggingTab = nil
                                 dropTargetTab = nil
                             }
@@ -193,50 +165,24 @@ struct ContentView: View {
         .frame(height: 38)
     }
 
-    private func isTabVisible(_ tab: AppTab) -> Bool {
-        switch tab {
-        case .branches: return settingsService.showBranchesTab
-        case .worktrees: return settingsService.showWorktreeTab
-        case .stashes: return settingsService.showStashTab
-        case .pullRequests: return settingsService.showPRTab
-        }
-    }
-
     private var hasVisibleTabs: Bool {
-        settingsService.tabOrder.contains(where: { isTabVisible($0) })
+        settingsService.tabOrder.contains(where: settingsService.isTabVisible)
     }
 
     private func selectFirstVisibleTab() {
-        if let first = settingsService.tabOrder.first(where: { isTabVisible($0) }) {
+        if let first = settingsService.tabOrder.first(where: settingsService.isTabVisible) {
             selectedTab = first
-        }
-    }
-
-    private func tabTitle(_ tab: AppTab) -> String {
-        switch tab {
-        case .branches: return "Branches"
-        case .worktrees: return "Worktrees"
-        case .stashes: return "Stashes"
-        case .pullRequests: return "PRs"
         }
     }
 
     private func tabCount(_ tab: AppTab) -> Int {
         switch tab {
-        case .branches: return gitService.branches.count
-        case .worktrees: return gitService.worktrees.count
-        case .stashes: return gitService.stashes.count
-        case .pullRequests: return gitService.pullRequests.count
+        case .branches: gitService.branches.count
+        case .worktrees: gitService.worktrees.count
+        case .stashes: gitService.stashes.count
+        case .pullRequests: gitService.pullRequests.count
         }
     }
-
-    // MARK: - Bottom Bar
-
-    private var bottomBar: some View {
-        BottomBar(onSettings: { withAnimation { showSettings = true } })
-    }
-
-    // MARK: - Empty State
 
     private var emptyState: some View {
         VStack(spacing: 12) {
@@ -255,12 +201,6 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-
-    private var allTabsHiddenState: some View {
-        AllTabsHiddenView()
-    }
-
-    // MARK: - Error Banner
 
     private func errorBanner(_ message: String) -> some View {
         HStack(spacing: 8) {
@@ -286,16 +226,13 @@ struct ContentView: View {
         .background(Color.orange.opacity(0.08))
     }
 
-    // MARK: - Helpers
-
     private var repoName: String {
         guard !gitService.repoPath.isEmpty else { return "No Repository" }
-        return URL(fileURLWithPath: gitService.repoPath).lastPathComponent
+        return RepositoryLocation(path: gitService.repoPath).name
     }
 
     private var shortPath: String {
-        let home = NSHomeDirectory()
-        return gitService.repoPath.replacingOccurrences(of: home, with: "~")
+        RepositoryLocation(path: gitService.repoPath).shortenedPath
     }
 
     private func addRepo() {
@@ -306,207 +243,4 @@ struct ContentView: View {
             }
         }
     }
-}
-
-// MARK: - All Tabs Hidden
-
-private struct AllTabsHiddenView: View {
-    @State private var isAnimating = false
-
-    private enum Constants {
-        static let spacing: CGFloat = 12
-        static let iconSize: CGFloat = 32
-        static let steamWispWidth: CGFloat = 3
-        static let steamWispHeight: CGFloat = 8
-        static let steamWispSpacing: CGFloat = 3
-        static let steamWispOpacity: Double = 0.35
-        static let steamOffsetX: CGFloat = -4
-        static let steamOffsetY: CGFloat = -12
-        static let animatedOffset: CGFloat = -6
-        static let animationDuration: Double = 1.1
-        static let animationStagger: Double = 0.3
-        static let titleFontSize: CGFloat = 14
-        static let subtitleFontSize: CGFloat = 12
-    }
-
-    var body: some View {
-        VStack(spacing: Constants.spacing) {
-            Spacer()
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: "cup.and.saucer")
-                    .font(.system(size: Constants.iconSize, weight: .light))
-                    .foregroundStyle(.secondary)
-                // Steam wisps
-                VStack(spacing: Constants.steamWispSpacing) {
-                    ForEach(0..<3, id: \.self) { i in
-                        Capsule()
-                            .fill(Color.secondary.opacity(Constants.steamWispOpacity))
-                            .frame(width: Constants.steamWispWidth, height: Constants.steamWispHeight)
-                            .offset(y: isAnimating ? Constants.animatedOffset : 0)
-                            .opacity(isAnimating ? 0 : 0.8)
-                            .animation(
-                                .easeInOut(duration: Constants.animationDuration)
-                                .repeatForever(autoreverses: false)
-                                .delay(Double(i) * Constants.animationStagger),
-                                value: isAnimating
-                            )
-                    }
-                }
-                .offset(x: Constants.steamOffsetX, y: Constants.steamOffsetY)
-            }
-            .onAppear { isAnimating = true }
-            Text("Nothing brewing here.")
-                .font(.system(size: Constants.titleFontSize, weight: .medium))
-                .foregroundStyle(.primary)
-            Text("Enable at least one tab in Settings to see something here.")
-                .font(.system(size: Constants.subtitleFontSize))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(2)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-// MARK: - Tab Button
-
-private struct TabButton: View {
-    let title: String
-    let count: Int
-    let tab: AppTab
-    let selected: AppTab
-    let action: () -> Void
-
-    var isSelected: Bool { tab == selected }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            HStack(spacing: 5) {
-                Text(title)
-                    .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-                if count > 0 {
-                    Text("\(count)")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(
-                            Capsule().fill(isSelected ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.1))
-                        )
-                }
-            }
-            Spacer()
-            Rectangle()
-                .fill(isSelected ? Color.accentColor : Color.clear)
-                .frame(height: 2)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture(perform: action)
-        .frame(maxWidth: .infinity)
-    }
-}
-
-// MARK: - Icon Button
-
-struct BackHeader: View {
-    let title: String
-    let action: () -> Void
-    var trailing: AnyView? = nil
-    @State private var isHovered = false
-
-    var body: some View {
-        HStack {
-            HStack(spacing: 10) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(isHovered ? .primary : .secondary)
-                    .frame(width: 28, height: 28)
-                    .background(isHovered ? Color.primary.opacity(0.07) : Color.clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.primary)
-                Spacer()
-            }
-            .frame(maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .onHover { h in withAnimation(.easeInOut(duration: 0.12)) { isHovered = h } }
-            .onTapGesture(perform: action)
-
-            trailing
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .frame(height: 58)
-    }
-}
-
-struct IconButton: View {
-    let systemImage: String
-    let tooltip: String
-    let action: () -> Void
-    @State private var isHovered = false
-
-    init(systemImage: String, tooltip: String = "", action: @escaping () -> Void) {
-        self.systemImage = systemImage
-        self.tooltip = tooltip
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isHovered ? .primary : .secondary)
-                .frame(width: 28, height: 28)
-                .background(isHovered ? Color.primary.opacity(0.07) : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .customTooltip(tooltip)
-    }
-}
-
-// MARK: - Bottom Bar
-
-struct BottomBar: View {
-    @Environment(GitService.self) private var gitService
-    @Environment(UpdateService.self) private var updateService
-    let onSettings: () -> Void
-
-    var body: some View {
-        HStack(spacing: 4) {
-            if gitService.isLoading {
-                ProgressView()
-                    .scaleEffect(0.55)
-                    .frame(width: 16, height: 16)
-            }
-            Spacer()
-            IconButton(systemImage: "arrow.clockwise", tooltip: "Refresh") {
-                Task { await gitService.refresh() }
-            }
-            .disabled(gitService.repoPath.isEmpty || gitService.isLoading)
-
-            if let version = updateService.availableUpdateVersion {
-                IconButton(systemImage: "arrow.down.circle.fill", tooltip: "Update to \(version)…") {
-                    updateService.installAvailableUpdate()
-                }
-            }
-
-            IconButton(systemImage: "gearshape", tooltip: "Settings") {
-                onSettings()
-            }
-
-            IconButton(systemImage: "power", tooltip: "Quit") {
-                NSApp.terminate(nil)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-    }
-
 }
