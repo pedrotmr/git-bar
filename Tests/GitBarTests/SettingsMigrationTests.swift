@@ -66,6 +66,18 @@ final class SettingsMigrationTests: XCTestCase {
         XCTAssertFalse(SettingsService(defaults: store.defaults, legacyDefaults: nil).isTabVisible(.branches))
     }
 
+    func testTabCasesMatchTheDefaultSettingsOrder() {
+        XCTAssertEqual(AppTab.allCases, AppTab.defaultOrder)
+    }
+
+    func testRepositoryPathShorteningRequiresAHomeDirectoryBoundary() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+
+        XCTAssertEqual(RepositoryLocation(path: home).shortenedPath, "~")
+        XCTAssertEqual(RepositoryLocation(path: home + "/repo").shortenedPath, "~/repo")
+        XCTAssertEqual(RepositoryLocation(path: home + "2/repo").shortenedPath, home + "2/repo")
+    }
+
     func testRepositoryAndTabReorderingPersistTheirCurrentOrder() {
         let store = defaults()
         defer { removeDomain(for: store) }

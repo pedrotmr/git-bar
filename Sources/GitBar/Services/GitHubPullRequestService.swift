@@ -54,6 +54,26 @@ final class GitHubPullRequestService {
         return result
     }
 
+    func checkoutPullRequest(_ pullRequest: PullRequest, at repositoryPath: String) async throws {
+        let result = await ShellExecutor.run(
+            "gh",
+            Self.checkoutArguments(for: pullRequest),
+            at: repositoryPath
+        )
+        guard result.exitCode == 0 else {
+            let message = Self.actionableCLIMessage(for: result)
+            throw GitCommandFailure(
+                message: message.isEmpty ? "GitHub CLI failed to check out pull request #\(pullRequest.number)." : message,
+                exitCode: result.exitCode,
+                hasDiagnostic: !result.stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            )
+        }
+    }
+
+    static func checkoutArguments(for pullRequest: PullRequest) -> [String] {
+        ["pr", "checkout", String(pullRequest.number)]
+    }
+
     static func actionableCLIMessage(for result: ShellResult) -> String {
         let message = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
         guard result.commandNotFound else { return message }
@@ -231,17 +251,23 @@ final class GitHubPullRequestService {
         return created + assigned + reviewRequested
     }
 
-    private static func parseGitHubOwnerAndRepository(from remoteURL: String) -> String? {
+    static func parseGitHubOwnerAndRepository(from remoteURL: String) -> String? {
         let raw: String
         if remoteURL.hasPrefix("git@github.com:") {
             raw = String(remoteURL.dropFirst("git@github.com:".count))
-        } else if let range = remoteURL.range(of: "github.com/") {
-            raw = String(remoteURL[range.upperBound...])
         } else {
-            return nil
+            guard let components = URLComponents(string: remoteURL),
+                  components.host?.caseInsensitiveCompare("github.com") == .orderedSame,
+                  ["https", "http", "ssh"].contains(components.scheme?.lowercased() ?? "")
+            else { return nil }
+            raw = String(components.path.dropFirst(components.path.hasPrefix("/") ? 1 : 0))
         }
 
         let path = raw.hasSuffix(".git") ? String(raw.dropLast(4)) : raw
-        return path.isEmpty ? nil : path
+        let parts = path.split(separator: "/")
+        guard parts.count == 2,
+              parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." })
+        else { return nil }
+        return parts.map(String.init).joined(separator: "/")
     }
 }

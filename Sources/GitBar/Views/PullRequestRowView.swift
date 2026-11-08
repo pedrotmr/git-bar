@@ -86,7 +86,11 @@ struct PullRequestRowView: View {
             Button("Copy URL") { copyWithFeedback(pr.url) }
             Button("Copy PR Number") { copyWithFeedback("#\(pr.number)") }
         }
-        .onDisappear { clearCopiedMessageTask?.cancel() }
+        .onDisappear {
+            clearCopiedMessageTask?.cancel()
+            clearCopiedMessageTask = nil
+            copiedMessage = nil
+        }
     }
 
     private func openInBrowser() {

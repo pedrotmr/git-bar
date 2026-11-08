@@ -42,6 +42,31 @@ final class CommandSearchPathTests: XCTestCase {
         XCTAssertTrue(actionableMessage.contains("gh auth login"))
     }
 
+    func testGitHubRepositoryParsingRequiresTheExactGitHubHost() {
+        XCTAssertEqual(
+            GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "https://github.com/owner/repo.git"),
+            "owner/repo"
+        )
+        XCTAssertEqual(
+            GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "git@github.com:owner/repo.git"),
+            "owner/repo"
+        )
+        XCTAssertNil(GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "https://evilgithub.com/owner/repo"))
+        XCTAssertNil(GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "https://example.com/github.com/owner/repo"))
+    }
+
+    func testPullRequestCheckoutUsesGitHubCLIPullRequestCommand() {
+        let pullRequest = PullRequest(
+            number: 42,
+            title: "Fork contribution",
+            headRefName: "feature",
+            url: "https://github.com/owner/repo/pull/42",
+            category: .assigned
+        )
+
+        XCTAssertEqual(GitHubPullRequestService.checkoutArguments(for: pullRequest), ["pr", "checkout", "42"])
+    }
+
     func testFindsAnExecutableInTheConfiguredPath() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("gitbar-path-test-\(UUID().uuidString)", isDirectory: true)

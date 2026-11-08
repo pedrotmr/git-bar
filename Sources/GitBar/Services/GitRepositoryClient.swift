@@ -115,11 +115,6 @@ nonisolated struct GitRepositoryClient {
         return result.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .clean : .changed
     }
 
-    func checkoutPullRequestBranch(_ name: String, at path: String) async throws {
-        _ = try await output(["fetch", "origin", name], at: path)
-        _ = try await output(["checkout", name], at: path)
-    }
-
     func checkoutBranch(_ name: String, at path: String) async throws {
         _ = try await output(["checkout", name], at: path)
     }

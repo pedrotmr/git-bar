@@ -7,8 +7,8 @@ nonisolated enum AppTab: String, CaseIterable, Identifiable, Sendable {
     }
 
     case branches
-    case worktrees
     case stashes
+    case worktrees
     case pullRequests
 
     static let defaultOrder: [AppTab] = [.branches, .stashes, .worktrees, .pullRequests]

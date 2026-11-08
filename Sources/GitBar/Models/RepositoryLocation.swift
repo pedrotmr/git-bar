@@ -8,9 +8,10 @@ nonisolated struct RepositoryLocation: Sendable {
     }
 
     var shortenedPath: String {
-        path.replacingOccurrences(
-            of: FileManager.default.homeDirectoryForCurrentUser.path,
-            with: "~"
-        )
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if path == home { return "~" }
+        let homePrefix = home.hasSuffix("/") ? home : home + "/"
+        guard path.hasPrefix(homePrefix) else { return path }
+        return "~" + path.dropFirst(home.count)
     }
 }

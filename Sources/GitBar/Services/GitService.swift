@@ -17,6 +17,8 @@ class GitService {
                 setupWatcher()
                 return
             }
+            refreshGeneration += 1
+            isLoading = false
             if !oldValue.isEmpty { persistSnapshot(for: oldValue) }
             applyRepoSelection(path: repoPath)
             setupWatcher()
@@ -43,6 +45,7 @@ class GitService {
     private var watcher: GitRepositoryWatcher?
     private var fetchTimer: Timer?
     private var isMutating = false
+    private var refreshGeneration = 0
     private var restoredFromCache = false
     private var awaitingFirstFetch = false
     private var repoCache: [String: RepoSnapshot] = [:]
@@ -110,13 +113,12 @@ class GitService {
     func refresh() async {
         let path = repoPath
         guard !path.isEmpty else { return }
+        refreshGeneration += 1
+        let generation = refreshGeneration
         isLoading = true
         errorMessage = nil
         await runFullFetch(at: path)
-        guard repoPath == path else {
-            isLoading = false
-            return
-        }
+        guard refreshGeneration == generation, repoPath == path else { return }
         isLoading = false
         awaitingFirstFetch = false
         persistSnapshot(for: path)
@@ -197,7 +199,7 @@ class GitService {
         let path = repoPath
         await withMutation {
             do {
-                try await repositoryClient.checkoutPullRequestBranch(pr.headRefName, at: path)
+                try await pullRequestService.checkoutPullRequest(pr, at: path)
                 await fetchBranches(at: path)
             } catch {
                 guard repoPath == path else { return }
