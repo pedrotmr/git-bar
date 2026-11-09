@@ -144,14 +144,17 @@ class GitService {
         persistSnapshot(for: path)
     }
 
-    func refreshSilently(expectedSelectionGeneration: Int? = nil) async {
+    func refreshSilently(
+        expectedSelectionGeneration: Int? = nil,
+        preservingError: Bool = false
+    ) async {
         let path = repoPath
         guard !path.isEmpty,
               expectedSelectionGeneration == nil || expectedSelectionGeneration == selectionGeneration
         else { return }
         refreshGeneration += 1
         let generation = refreshGeneration
-        errorMessage = nil
+        if !preservingError { errorMessage = nil }
         await runFullFetch(at: path, generation: generation)
         guard refreshGeneration == generation,
               repoPath == path,
@@ -298,11 +301,13 @@ class GitService {
             errorMessage = nil
             let result = await repositoryClient.deleteLocalAndRemoteBranch(name, at: path)
             guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
-            if let remoteError = result.remoteError, !remoteError.isEmpty {
-                appendError("Remote deletion failed: \(remoteError)")
-            }
+            let remoteFailure = result.remoteError.flatMap { $0.isEmpty ? nil : $0 }
+            if let remoteFailure { appendError("Remote deletion failed: \(remoteFailure)") }
             if result.deletedLocally {
-                await refreshSilently(expectedSelectionGeneration: selectedGeneration)
+                await refreshSilently(
+                    expectedSelectionGeneration: selectedGeneration,
+                    preservingError: remoteFailure != nil
+                )
             } else if let localError = result.localError {
                 appendError(localError)
             }
