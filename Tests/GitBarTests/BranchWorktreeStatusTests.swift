@@ -3,27 +3,69 @@ import Foundation
 import XCTest
 
 private actor SequencedBranchFetcher {
+    private let holdsFirstRequest: Bool
     private var requestCount = 0
-    private var firstRequestStarted = false
-    private var firstRequestWaiters: [CheckedContinuation<Void, Never>] = []
+    private var requestWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var firstRequestReleased = false
+    private var firstRequestContinuation: CheckedContinuation<Void, Never>?
+
+    init(holdsFirstRequest: Bool = false) {
+        self.holdsFirstRequest = holdsFirstRequest
+    }
 
     func fetch() async -> [Branch] {
         requestCount += 1
-        if requestCount == 1 {
-            firstRequestStarted = true
-            firstRequestWaiters.forEach { $0.resume() }
-            firstRequestWaiters.removeAll()
-            try? await Task.sleep(nanoseconds: 200_000_000)
+        let currentRequest = requestCount
+        let readyWaiters = requestWaiters.filter { $0.count <= currentRequest }
+        requestWaiters.removeAll { $0.count <= currentRequest }
+        readyWaiters.forEach { $0.continuation.resume() }
+
+        if currentRequest == 1 {
+            if holdsFirstRequest && !firstRequestReleased {
+                await withCheckedContinuation { firstRequestContinuation = $0 }
+            }
             return [Branch(name: "stale", isCurrent: false)]
         }
         return [Branch(name: "fresh", isCurrent: false)]
     }
 
-    func waitForFirstRequest() async {
-        guard !firstRequestStarted else { return }
+    func waitForRequest(_ count: Int) async {
+        guard requestCount < count else { return }
         await withCheckedContinuation { continuation in
-            firstRequestWaiters.append(continuation)
+            requestWaiters.append((count, continuation))
         }
+    }
+
+    func releaseFirstRequest() {
+        firstRequestReleased = true
+        firstRequestContinuation?.resume()
+        firstRequestContinuation = nil
+    }
+}
+
+private actor CheckoutGate {
+    private var checkoutStarted = false
+    private var released = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    func pauseUntilReleased() async {
+        checkoutStarted = true
+        startWaiters.forEach { $0.resume() }
+        startWaiters.removeAll()
+        guard !released else { return }
+        await withCheckedContinuation { releaseContinuation = $0 }
+    }
+
+    func waitForCheckoutStart() async {
+        guard !checkoutStarted else { return }
+        await withCheckedContinuation { startWaiters.append($0) }
+    }
+
+    func release() {
+        released = true
+        releaseContinuation?.resume()
+        releaseContinuation = nil
     }
 }
 
@@ -72,13 +114,15 @@ final class BranchWorktreeStatusTests: XCTestCase {
         try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: path) }
 
-        let fetcher = SequencedBranchFetcher()
+        let fetcher = SequencedBranchFetcher(holdsFirstRequest: true)
         let service = GitService(branchFetcher: { _ in await fetcher.fetch() })
         service.selectRepository(path.path)
 
         let staleRefresh = Task { await service.refreshSilently() }
-        await fetcher.waitForFirstRequest()
+        await fetcher.waitForRequest(1)
         await service.refresh()
+        XCTAssertEqual(service.branches.map(\.name), ["fresh"])
+        await fetcher.releaseFirstRequest()
         await staleRefresh.value
 
         XCTAssertEqual(service.branches.map(\.name), ["fresh"])
@@ -93,16 +137,84 @@ final class BranchWorktreeStatusTests: XCTestCase {
         try FileManager.default.createDirectory(at: secondPath, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let fetcher = SequencedBranchFetcher()
+        let fetcher = SequencedBranchFetcher(holdsFirstRequest: true)
         let service = GitService(branchFetcher: { _ in await fetcher.fetch() })
         service.selectRepository(firstPath.path)
 
         let staleRefresh = Task { await service.refresh() }
-        await fetcher.waitForFirstRequest()
+        await fetcher.waitForRequest(1)
         service.selectRepository(secondPath.path)
         service.selectRepository(firstPath.path)
         await service.refresh()
+        await fetcher.releaseFirstRequest()
         await staleRefresh.value
+
+        XCTAssertEqual(service.branches.map(\.name), ["fresh"])
+    }
+
+    func testSuccessfulMutationInvalidatesAnOlderRefresh() async throws {
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("GitBarMutationTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: path) }
+
+        let fetcher = SequencedBranchFetcher(holdsFirstRequest: true)
+        let checkoutGate = CheckoutGate()
+        let service = GitService(
+            branchFetcher: { _ in await fetcher.fetch() },
+            checkoutPullRequest: { _, _ in await checkoutGate.pauseUntilReleased() }
+        )
+        service.selectRepository(path.path)
+        let pullRequest = PullRequest(
+            number: 42,
+            title: "Feature branch",
+            headRefName: "feature",
+            url: "https://github.com/owner/repo/pull/42",
+            category: .assigned
+        )
+
+        let checkout = Task { await service.checkoutPRBranch(pullRequest) }
+        await checkoutGate.waitForCheckoutStart()
+        let olderRefresh = Task { await service.refresh() }
+        await fetcher.waitForRequest(1)
+
+        await checkoutGate.release()
+        await checkout.value
+        await fetcher.waitForRequest(2)
+        await fetcher.releaseFirstRequest()
+        await olderRefresh.value
+
+        XCTAssertEqual(service.branches.map(\.name), ["fresh"])
+    }
+
+    func testCheckoutRefreshUsesCurrentGenerationAfterInterveningRefresh() async throws {
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("GitBarMutationTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: path) }
+
+        let fetcher = SequencedBranchFetcher()
+        let checkoutGate = CheckoutGate()
+        let service = GitService(
+            branchFetcher: { _ in await fetcher.fetch() },
+            checkoutPullRequest: { _, _ in await checkoutGate.pauseUntilReleased() }
+        )
+        service.selectRepository(path.path)
+        let pullRequest = PullRequest(
+            number: 42,
+            title: "Feature branch",
+            headRefName: "feature",
+            url: "https://github.com/owner/repo/pull/42",
+            category: .assigned
+        )
+
+        let checkout = Task { await service.checkoutPRBranch(pullRequest) }
+        await checkoutGate.waitForCheckoutStart()
+        await service.refresh()
+        XCTAssertEqual(service.branches.map(\.name), ["stale"])
+
+        await checkoutGate.release()
+        await checkout.value
 
         XCTAssertEqual(service.branches.map(\.name), ["fresh"])
     }
