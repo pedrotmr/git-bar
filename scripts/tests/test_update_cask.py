@@ -1,8 +1,9 @@
+import json
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
-import shutil
 from pathlib import Path
 
 
@@ -125,6 +126,43 @@ class UpdateCaskTests(unittest.TestCase):
         self.assertIn('app "ReleaseProduct.app"', content)
         self.assertIn("ReleaseProduct-#{version}.zip", content)
         self.assertNotIn("LegacyExecutable", content)
+
+    def test_legacy_release_uses_current_cask_metadata_when_missing(self):
+        legacy_release = Path(self.temp_dir.name) / "legacy-release"
+        (legacy_release / "Config").mkdir(parents=True)
+        (legacy_release / "Config/App.xcconfig").write_text(
+            "RELEASE_OWNER = pedrotmr\nRELEASE_SLUG = git-bar\n"
+            "PRODUCT_BUNDLE_IDENTIFIER = com.GitBar.app\nPRODUCT_NAME = LegacyGitBar\nSPARKLE_ENABLED = YES\n",
+            encoding="utf-8",
+        )
+        (legacy_release / "Config/Project.xcconfig").write_text("MACOSX_DEPLOYMENT_TARGET = 14.6\n", encoding="utf-8")
+        current = subprocess.run(
+            [sys.executable, str(self.script), "--print-homebrew-settings"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        legacy = subprocess.run(
+            [
+                sys.executable,
+                str(self.script),
+                "--config-root", str(legacy_release),
+                "--fallback-config-root", str(self.project_dir),
+                "--print-homebrew-settings",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(current.returncode, 0, current.stderr)
+        self.assertEqual(legacy.returncode, 0, legacy.stderr)
+        current_settings = json.loads(current.stdout)
+        legacy_settings = json.loads(legacy.stdout)
+        self.assertEqual(legacy_settings["app_name"], "LegacyGitBar")
+        self.assertEqual(legacy_settings["cask_token"], current_settings["cask_token"])
+        self.assertEqual(legacy_settings["app_display_name"], current_settings["app_display_name"])
+        self.assertEqual(legacy_settings["description"], current_settings["description"])
 
     def test_same_version_with_a_different_checksum_fails(self):
         self.assertEqual(self.run_generator("1.2.0", "a" * 64).returncode, 0)
