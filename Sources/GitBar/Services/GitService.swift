@@ -17,6 +17,7 @@ class GitService {
                 setupWatcher()
                 return
             }
+            selectionGeneration += 1
             refreshGeneration += 1
             isLoading = false
             if !oldValue.isEmpty { persistSnapshot(for: oldValue) }
@@ -42,20 +43,30 @@ class GitService {
 
     private let repositoryClient: GitRepositoryClient
     private let branchFetcher: (String) async throws -> [Branch]
-    private let pullRequestService = GitHubPullRequestService()
+    private let pullRequestService: GitHubPullRequestService
+    private let checkoutPullRequest: (PullRequest, String) async throws -> Void
     private var watcher: GitRepositoryWatcher?
     private var fetchTimer: Timer?
     private var isMutating = false
     private var refreshGeneration = 0
+    private var selectionGeneration = 0
     private var restoredFromCache = false
     private var awaitingFirstFetch = false
     private var repoCache: [String: RepoSnapshot] = [:]
 
-    init(branchFetcher: ((String) async throws -> [Branch])? = nil) {
+    init(
+        branchFetcher: ((String) async throws -> [Branch])? = nil,
+        checkoutPullRequest: ((PullRequest, String) async throws -> Void)? = nil
+    ) {
         let repositoryClient = GitRepositoryClient()
+        let pullRequestService = GitHubPullRequestService()
         self.repositoryClient = repositoryClient
+        self.pullRequestService = pullRequestService
         self.branchFetcher = branchFetcher ?? { path in
             try await repositoryClient.branches(at: path)
+        }
+        self.checkoutPullRequest = checkoutPullRequest ?? { pullRequest, path in
+            try await pullRequestService.checkoutPullRequest(pullRequest, at: path)
         }
     }
 
@@ -133,14 +144,19 @@ class GitService {
         persistSnapshot(for: path)
     }
 
-    func refreshSilently() async {
+    func refreshSilently(expectedSelectionGeneration: Int? = nil) async {
         let path = repoPath
-        guard !path.isEmpty else { return }
+        guard !path.isEmpty,
+              expectedSelectionGeneration == nil || expectedSelectionGeneration == selectionGeneration
+        else { return }
         refreshGeneration += 1
         let generation = refreshGeneration
         errorMessage = nil
         await runFullFetch(at: path, generation: generation)
-        guard refreshGeneration == generation, repoPath == path else { return }
+        guard refreshGeneration == generation,
+              repoPath == path,
+              expectedSelectionGeneration == nil || expectedSelectionGeneration == selectionGeneration
+        else { return }
         isLoading = false
         awaitingFirstFetch = false
         persistSnapshot(for: path)
@@ -199,6 +215,26 @@ class GitService {
         if let error = result.errorMessage { appendError(error) }
     }
 
+    private func isCurrentSelection(path: String, generation: Int) -> Bool {
+        selectionGeneration == generation && repoPath == path
+    }
+
+    private func refreshBranchesAfterMutation(at path: String, selectionGeneration: Int) async {
+        guard isCurrentSelection(path: path, generation: selectionGeneration) else { return }
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        await fetchBranches(at: path, generation: generation)
+        if refreshGeneration == generation { isLoading = false }
+    }
+
+    private func refreshStashesAfterMutation(at path: String, selectionGeneration: Int) async {
+        guard isCurrentSelection(path: path, generation: selectionGeneration) else { return }
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        await fetchStashes(at: path, generation: generation)
+        if refreshGeneration == generation { isLoading = false }
+    }
+
     private func appendError(_ message: String) {
         if let existing = errorMessage {
             errorMessage = existing + "\n" + message
@@ -209,13 +245,13 @@ class GitService {
 
     func checkoutPRBranch(_ pr: PullRequest) async {
         let path = repoPath
-        let generation = refreshGeneration
+        let selectedGeneration = selectionGeneration
         await withMutation {
             do {
-                try await pullRequestService.checkoutPullRequest(pr, at: path)
-                await fetchBranches(at: path, generation: generation)
+                try await checkoutPullRequest(pr, path)
+                await refreshBranchesAfterMutation(at: path, selectionGeneration: selectedGeneration)
             } catch {
-                guard refreshGeneration == generation, repoPath == path else { return }
+                guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
                 errorMessage = error.localizedDescription
             }
         }
@@ -223,13 +259,13 @@ class GitService {
 
     func switchBranch(_ name: String) async {
         let path = repoPath
-        let generation = refreshGeneration
+        let selectedGeneration = selectionGeneration
         await withMutation {
             do {
                 try await repositoryClient.checkoutBranch(name, at: path)
-                await fetchBranches(at: path, generation: generation)
+                await refreshBranchesAfterMutation(at: path, selectionGeneration: selectedGeneration)
             } catch {
-                guard refreshGeneration == generation, repoPath == path else { return }
+                guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
                 errorMessage = error.localizedDescription
             }
         }
@@ -238,16 +274,19 @@ class GitService {
     func pullCurrentBranch() async {
         guard let currentBranch = branches.first(where: \.isCurrent), currentBranch.upstream != nil else { return }
         let path = repoPath
+        let selectedGeneration = selectionGeneration
         await withMutation {
             errorMessage = nil
             do {
                 try await repositoryClient.pullCurrentBranch(at: path)
-                if repoPath == path { await refreshSilently() }
+                if isCurrentSelection(path: path, generation: selectedGeneration) {
+                    await refreshSilently(expectedSelectionGeneration: selectedGeneration)
+                }
             } catch let error as GitCommandFailure where !error.hasDiagnostic {
-                guard repoPath == path else { return }
+                guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
                 errorMessage = "Could not pull updates (exit code \(error.exitCode))."
             } catch {
-                guard repoPath == path else { return }
+                guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
                 errorMessage = error.localizedDescription
             }
         }
@@ -255,14 +294,14 @@ class GitService {
 
     func deleteBranch(_ name: String, force: Bool = false) async {
         let path = repoPath
-        let generation = refreshGeneration
+        let selectedGeneration = selectionGeneration
         await withMutation {
             errorMessage = nil
             do {
                 try await repositoryClient.deleteBranch(name, force: force, at: path)
-                await fetchBranches(at: path, generation: generation)
+                await refreshBranchesAfterMutation(at: path, selectionGeneration: selectedGeneration)
             } catch {
-                guard refreshGeneration == generation, repoPath == path else { return }
+                guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
                 errorMessage = error.localizedDescription
             }
         }
@@ -270,16 +309,16 @@ class GitService {
 
     func deleteLocalAndRemoteBranch(_ name: String) async {
         let path = repoPath
-        let generation = refreshGeneration
+        let selectedGeneration = selectionGeneration
         await withMutation {
             errorMessage = nil
             let result = await repositoryClient.deleteLocalAndRemoteBranch(name, at: path)
-            guard refreshGeneration == generation, repoPath == path else { return }
+            guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
             if let remoteError = result.remoteError, !remoteError.isEmpty {
                 appendError("Remote deletion failed: \(remoteError)")
             }
             if result.deletedLocally {
-                await fetchBranches(at: path, generation: generation)
+                await refreshBranchesAfterMutation(at: path, selectionGeneration: selectedGeneration)
             } else if let localError = result.localError {
                 appendError(localError)
             }
@@ -288,12 +327,15 @@ class GitService {
 
     func deleteWorktreeAndBranch(_ worktree: Worktree) async {
         let path = repoPath
+        let selectedGeneration = selectionGeneration
         await withMutation {
             do {
                 try await repositoryClient.deleteWorktreeAndBranch(worktree, at: path)
-                if repoPath == path { await refreshSilently() }
+                if isCurrentSelection(path: path, generation: selectedGeneration) {
+                    await refreshSilently(expectedSelectionGeneration: selectedGeneration)
+                }
             } catch {
-                guard repoPath == path else { return }
+                guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
                 errorMessage = error.localizedDescription
             }
         }
@@ -313,15 +355,15 @@ class GitService {
 
     private func runStashCommand(_ operation: StashOperation, ref: String) async {
         let path = repoPath
-        let generation = refreshGeneration
+        let selectedGeneration = selectionGeneration
         await withMutation {
             errorMessage = nil
             do {
                 try await repositoryClient.runStash(operation, ref: ref, at: path)
-                await fetchStashes(at: path, generation: generation)
-                if repoPath == path { persistSnapshot(for: path) }
+                await refreshStashesAfterMutation(at: path, selectionGeneration: selectedGeneration)
+                if isCurrentSelection(path: path, generation: selectedGeneration) { persistSnapshot(for: path) }
             } catch {
-                guard refreshGeneration == generation, repoPath == path else { return }
+                guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
                 errorMessage = error.localizedDescription
             }
         }
