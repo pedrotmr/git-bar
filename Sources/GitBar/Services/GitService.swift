@@ -219,22 +219,6 @@ class GitService {
         selectionGeneration == generation && repoPath == path
     }
 
-    private func refreshBranchesAfterMutation(at path: String, selectionGeneration: Int) async {
-        guard isCurrentSelection(path: path, generation: selectionGeneration) else { return }
-        refreshGeneration += 1
-        let generation = refreshGeneration
-        await fetchBranches(at: path, generation: generation)
-        if refreshGeneration == generation { isLoading = false }
-    }
-
-    private func refreshStashesAfterMutation(at path: String, selectionGeneration: Int) async {
-        guard isCurrentSelection(path: path, generation: selectionGeneration) else { return }
-        refreshGeneration += 1
-        let generation = refreshGeneration
-        await fetchStashes(at: path, generation: generation)
-        if refreshGeneration == generation { isLoading = false }
-    }
-
     private func appendError(_ message: String) {
         if let existing = errorMessage {
             errorMessage = existing + "\n" + message
@@ -249,7 +233,7 @@ class GitService {
         await withMutation {
             do {
                 try await checkoutPullRequest(pr, path)
-                await refreshBranchesAfterMutation(at: path, selectionGeneration: selectedGeneration)
+                await refreshSilently(expectedSelectionGeneration: selectedGeneration)
             } catch {
                 guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
                 errorMessage = error.localizedDescription
@@ -263,7 +247,7 @@ class GitService {
         await withMutation {
             do {
                 try await repositoryClient.checkoutBranch(name, at: path)
-                await refreshBranchesAfterMutation(at: path, selectionGeneration: selectedGeneration)
+                await refreshSilently(expectedSelectionGeneration: selectedGeneration)
             } catch {
                 guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
                 errorMessage = error.localizedDescription
@@ -299,7 +283,7 @@ class GitService {
             errorMessage = nil
             do {
                 try await repositoryClient.deleteBranch(name, force: force, at: path)
-                await refreshBranchesAfterMutation(at: path, selectionGeneration: selectedGeneration)
+                await refreshSilently(expectedSelectionGeneration: selectedGeneration)
             } catch {
                 guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
                 errorMessage = error.localizedDescription
@@ -318,7 +302,7 @@ class GitService {
                 appendError("Remote deletion failed: \(remoteError)")
             }
             if result.deletedLocally {
-                await refreshBranchesAfterMutation(at: path, selectionGeneration: selectedGeneration)
+                await refreshSilently(expectedSelectionGeneration: selectedGeneration)
             } else if let localError = result.localError {
                 appendError(localError)
             }
@@ -360,8 +344,7 @@ class GitService {
             errorMessage = nil
             do {
                 try await repositoryClient.runStash(operation, ref: ref, at: path)
-                await refreshStashesAfterMutation(at: path, selectionGeneration: selectedGeneration)
-                if isCurrentSelection(path: path, generation: selectedGeneration) { persistSnapshot(for: path) }
+                await refreshSilently(expectedSelectionGeneration: selectedGeneration)
             } catch {
                 guard isCurrentSelection(path: path, generation: selectedGeneration) else { return }
                 errorMessage = error.localizedDescription
