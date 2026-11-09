@@ -40,7 +40,8 @@ class GitService {
         didSet { autoFetchEnabled ? startFetchTimer() : stopFetchTimer() }
     }
 
-    private let repositoryClient = GitRepositoryClient()
+    private let repositoryClient: GitRepositoryClient
+    private let branchFetcher: (String) async throws -> [Branch]
     private let pullRequestService = GitHubPullRequestService()
     private var watcher: GitRepositoryWatcher?
     private var fetchTimer: Timer?
@@ -49,6 +50,14 @@ class GitService {
     private var restoredFromCache = false
     private var awaitingFirstFetch = false
     private var repoCache: [String: RepoSnapshot] = [:]
+
+    init(branchFetcher: ((String) async throws -> [Branch])? = nil) {
+        let repositoryClient = GitRepositoryClient()
+        self.repositoryClient = repositoryClient
+        self.branchFetcher = branchFetcher ?? { path in
+            try await repositoryClient.branches(at: path)
+        }
+    }
 
     private func cacheKey(_ path: String) -> String {
         (path as NSString).standardizingPath
@@ -102,11 +111,11 @@ class GitService {
         pullRequests = []
     }
 
-    private func runFullFetch(at path: String) async {
-        async let branches: Void = fetchBranches(at: path)
-        async let worktrees: Void = fetchWorktrees(at: path)
-        async let stashes: Void = fetchStashes(at: path)
-        async let pullRequests: Void = fetchPullRequests(at: path)
+    private func runFullFetch(at path: String, generation: Int) async {
+        async let branches: Void = fetchBranches(at: path, generation: generation)
+        async let worktrees: Void = fetchWorktrees(at: path, generation: generation)
+        async let stashes: Void = fetchStashes(at: path, generation: generation)
+        async let pullRequests: Void = fetchPullRequests(at: path, generation: generation)
         _ = await (branches, worktrees, stashes, pullRequests)
     }
 
@@ -117,19 +126,22 @@ class GitService {
         let generation = refreshGeneration
         isLoading = true
         errorMessage = nil
-        await runFullFetch(at: path)
+        await runFullFetch(at: path, generation: generation)
         guard refreshGeneration == generation, repoPath == path else { return }
         isLoading = false
         awaitingFirstFetch = false
         persistSnapshot(for: path)
     }
 
-    private func refreshSilently() async {
+    func refreshSilently() async {
         let path = repoPath
         guard !path.isEmpty else { return }
+        refreshGeneration += 1
+        let generation = refreshGeneration
         errorMessage = nil
-        await runFullFetch(at: path)
-        guard repoPath == path else { return }
+        await runFullFetch(at: path, generation: generation)
+        guard refreshGeneration == generation, repoPath == path else { return }
+        isLoading = false
         awaitingFirstFetch = false
         persistSnapshot(for: path)
     }
@@ -147,42 +159,42 @@ class GitService {
         }
     }
 
-    private func fetchBranches(at path: String) async {
+    private func fetchBranches(at path: String, generation: Int) async {
         do {
-            let fetched = try await repositoryClient.branches(at: path)
-            guard repoPath == path else { return }
+            let fetched = try await branchFetcher(path)
+            guard refreshGeneration == generation, repoPath == path else { return }
             branches = fetched
         } catch {
-            guard repoPath == path else { return }
+            guard refreshGeneration == generation, repoPath == path else { return }
             appendError(error.localizedDescription)
         }
     }
 
-    private func fetchWorktrees(at path: String) async {
+    private func fetchWorktrees(at path: String, generation: Int) async {
         do {
             let fetched = try await repositoryClient.worktrees(at: path)
-            guard repoPath == path else { return }
+            guard refreshGeneration == generation, repoPath == path else { return }
             worktrees = fetched
         } catch {
-            guard repoPath == path else { return }
+            guard refreshGeneration == generation, repoPath == path else { return }
             appendError(error.localizedDescription)
         }
     }
 
-    private func fetchStashes(at path: String) async {
+    private func fetchStashes(at path: String, generation: Int) async {
         do {
             let fetched = try await repositoryClient.stashes(at: path)
-            guard repoPath == path else { return }
+            guard refreshGeneration == generation, repoPath == path else { return }
             stashes = fetched
         } catch {
-            guard repoPath == path else { return }
+            guard refreshGeneration == generation, repoPath == path else { return }
             appendError(error.localizedDescription)
         }
     }
 
-    private func fetchPullRequests(at path: String) async {
+    private func fetchPullRequests(at path: String, generation: Int) async {
         let result = await pullRequestService.fetchPullRequests(in: path)
-        guard repoPath == path else { return }
+        guard refreshGeneration == generation, repoPath == path else { return }
         pullRequests = result.pullRequests
         if let error = result.errorMessage { appendError(error) }
     }
@@ -197,12 +209,13 @@ class GitService {
 
     func checkoutPRBranch(_ pr: PullRequest) async {
         let path = repoPath
+        let generation = refreshGeneration
         await withMutation {
             do {
                 try await pullRequestService.checkoutPullRequest(pr, at: path)
-                await fetchBranches(at: path)
+                await fetchBranches(at: path, generation: generation)
             } catch {
-                guard repoPath == path else { return }
+                guard refreshGeneration == generation, repoPath == path else { return }
                 errorMessage = error.localizedDescription
             }
         }
@@ -210,12 +223,13 @@ class GitService {
 
     func switchBranch(_ name: String) async {
         let path = repoPath
+        let generation = refreshGeneration
         await withMutation {
             do {
                 try await repositoryClient.checkoutBranch(name, at: path)
-                await fetchBranches(at: path)
+                await fetchBranches(at: path, generation: generation)
             } catch {
-                guard repoPath == path else { return }
+                guard refreshGeneration == generation, repoPath == path else { return }
                 errorMessage = error.localizedDescription
             }
         }
@@ -241,13 +255,14 @@ class GitService {
 
     func deleteBranch(_ name: String, force: Bool = false) async {
         let path = repoPath
+        let generation = refreshGeneration
         await withMutation {
             errorMessage = nil
             do {
                 try await repositoryClient.deleteBranch(name, force: force, at: path)
-                await fetchBranches(at: path)
+                await fetchBranches(at: path, generation: generation)
             } catch {
-                guard repoPath == path else { return }
+                guard refreshGeneration == generation, repoPath == path else { return }
                 errorMessage = error.localizedDescription
             }
         }
@@ -255,15 +270,16 @@ class GitService {
 
     func deleteLocalAndRemoteBranch(_ name: String) async {
         let path = repoPath
+        let generation = refreshGeneration
         await withMutation {
             errorMessage = nil
             let result = await repositoryClient.deleteLocalAndRemoteBranch(name, at: path)
-            guard repoPath == path else { return }
+            guard refreshGeneration == generation, repoPath == path else { return }
             if let remoteError = result.remoteError, !remoteError.isEmpty {
                 appendError("Remote deletion failed: \(remoteError)")
             }
             if result.deletedLocally {
-                await fetchBranches(at: path)
+                await fetchBranches(at: path, generation: generation)
             } else if let localError = result.localError {
                 appendError(localError)
             }
@@ -297,14 +313,15 @@ class GitService {
 
     private func runStashCommand(_ operation: StashOperation, ref: String) async {
         let path = repoPath
+        let generation = refreshGeneration
         await withMutation {
             errorMessage = nil
             do {
                 try await repositoryClient.runStash(operation, ref: ref, at: path)
-                await fetchStashes(at: path)
+                await fetchStashes(at: path, generation: generation)
                 if repoPath == path { persistSnapshot(for: path) }
             } catch {
-                guard repoPath == path else { return }
+                guard refreshGeneration == generation, repoPath == path else { return }
                 errorMessage = error.localizedDescription
             }
         }
