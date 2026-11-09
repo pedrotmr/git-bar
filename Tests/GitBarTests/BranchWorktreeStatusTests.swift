@@ -108,6 +108,28 @@ final class BranchWorktreeStatusTests: XCTestCase {
         XCTAssertTrue(needsConfirmation)
     }
 
+    func testRemoteDeletionFailureRemainsVisibleAfterLocalDeletion() async throws {
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("GitBarRemoteDeletionTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: path) }
+
+        try runGit(["init"], at: path)
+        try runGit([
+            "-c", "user.name=GitBar Tests",
+            "-c", "user.email=gitbar-tests@example.com",
+            "commit", "--allow-empty", "-m", "initial"
+        ], at: path)
+        try runGit(["branch", "feature"], at: path)
+
+        let service = GitService()
+        service.selectRepository(path.path)
+        await service.deleteLocalAndRemoteBranch("feature")
+
+        XCTAssertFalse(service.branches.contains(where: { $0.name == "feature" }))
+        XCTAssertTrue(service.errorMessage?.contains("Remote deletion failed:") == true)
+    }
+
     func testStaleSilentRefreshCannotReplaceANewerRefreshForSameRepository() async throws {
         let path = FileManager.default.temporaryDirectory
             .appendingPathComponent("GitBarRefreshTests-\(UUID().uuidString)", isDirectory: true)
