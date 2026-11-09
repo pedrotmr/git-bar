@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -110,6 +111,77 @@ class UpdateCaskTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("cask token", result.stderr)
+
+    def test_homebrew_rejected_cask_tokens_are_invalid(self):
+        app_config = self.project_dir / "Config/App.xcconfig"
+        original = app_config.read_text(encoding="utf-8")
+        try:
+            for token in ("Uppercase", "-leading", "trailing-", "double--hyphen"):
+                with self.subTest(token=token):
+                    app_config.write_text(
+                        re.sub(r"(?m)^HOMEBREW_CASK_TOKEN\s*=.*$", f"HOMEBREW_CASK_TOKEN = {token}", original),
+                        encoding="utf-8",
+                    )
+                    result = subprocess.run(
+                        [sys.executable, str(self.script), "--print-cask-token"],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("cask token", result.stderr)
+        finally:
+            app_config.write_text(original, encoding="utf-8")
+
+    def test_print_cask_token_returns_the_configured_token(self):
+        result = subprocess.run(
+            [sys.executable, str(self.script), "--print-cask-token"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "pedrotmr-git-bar")
+
+    def test_print_cask_token_rejects_release_arguments(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(self.script),
+                "--print-cask-token",
+                "--tap-dir", str(self.tap_dir),
+                "--version", "1.2.0",
+                "--sha256", "a" * 64,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("cannot be combined", result.stderr)
+
+    def test_unsafe_release_owner_and_slug_are_rejected(self):
+        app_config = self.project_dir / "Config/App.xcconfig"
+        original = app_config.read_text(encoding="utf-8")
+        try:
+            for key in ("RELEASE_OWNER", "RELEASE_SLUG"):
+                with self.subTest(key=key):
+                    app_config.write_text(
+                        re.sub(rf"(?m)^{key}\s*=.*$", f'{key} = invalid"metadata', original),
+                        encoding="utf-8",
+                    )
+                    result = subprocess.run(
+                        [sys.executable, str(self.script), "--print-homebrew-settings"],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(f"release {key.split('_')[1].lower()}", result.stderr)
+        finally:
+            app_config.write_text(original, encoding="utf-8")
 
     def test_product_name_is_used_instead_of_executable_name(self):
         app_config = self.project_dir / "Config/App.xcconfig"
