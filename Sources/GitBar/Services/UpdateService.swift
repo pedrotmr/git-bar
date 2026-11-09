@@ -22,6 +22,10 @@ final class UpdateService {
         managedByHomebrew ? homebrewUpdater : controller?.updater
     }
 
+    static func homebrewUpdateCommand(caskToken: String) -> String {
+        "brew upgrade --cask pedrotmr/git-bar/\(caskToken)"
+    }
+
     init() {
         let bundle = Bundle.main
         let bundleIdentifier = bundle.bundleIdentifier ?? "com.GitBar.app"
@@ -37,9 +41,10 @@ final class UpdateService {
         self.updaterDelegate = updaterDelegate
 
         if managedByHomebrew {
+            let caskToken = bundle.object(forInfoDictionaryKey: "HOMEBREW_CASK_TOKEN") as? String ?? "pedrotmr-git-bar"
             let userDriver = HomebrewUserDriver(
                 appName: "GitBar",
-                updateCommand: "brew upgrade --cask pedrotmr/git-bar/pedrotmr-git-bar",
+                updateCommand: Self.homebrewUpdateCommand(caskToken: caskToken),
                 hostBundle: bundle,
                 delegate: userDriverDelegate
             )

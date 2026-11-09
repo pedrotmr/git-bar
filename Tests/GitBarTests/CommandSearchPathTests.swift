@@ -51,6 +51,10 @@ final class CommandSearchPathTests: XCTestCase {
             GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "git@github.com:owner/repo.git"),
             "owner/repo"
         )
+        XCTAssertEqual(
+            GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "git://github.com/owner/repo.git"),
+            "owner/repo"
+        )
         XCTAssertNil(GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "https://evilgithub.com/owner/repo"))
         XCTAssertNil(GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "https://example.com/github.com/owner/repo"))
     }
@@ -64,7 +68,28 @@ final class CommandSearchPathTests: XCTestCase {
             category: .assigned
         )
 
-        XCTAssertEqual(GitHubPullRequestService.checkoutArguments(for: pullRequest), ["pr", "checkout", "42"])
+        XCTAssertEqual(
+            GitHubPullRequestService.checkoutArguments(for: pullRequest),
+            ["pr", "checkout", "https://github.com/owner/repo/pull/42"]
+        )
+    }
+
+    func testPullRequestCLIErrorCanBeReportedAgainAfterARecovery() throws {
+        var state = GitHubCLIErrorState()
+        let failure = ShellResult(stdout: "", stderr: "permission denied", exitCode: 1)
+        let success = ShellResult(stdout: "[]", stderr: "", exitCode: 0)
+
+        XCTAssertTrue(try XCTUnwrap(state.message(for: failure)).contains("permission denied"))
+        XCTAssertNil(state.message(for: failure))
+        XCTAssertNil(state.message(for: success))
+        XCTAssertTrue(try XCTUnwrap(state.message(for: failure)).contains("permission denied"))
+    }
+
+    func testHomebrewUpdateCommandUsesConfiguredCaskToken() {
+        XCTAssertEqual(
+            UpdateService.homebrewUpdateCommand(caskToken: "custom-gitbar"),
+            "brew upgrade --cask pedrotmr/git-bar/custom-gitbar"
+        )
     }
 
     func testFindsAnExecutableInTheConfiguredPath() throws {

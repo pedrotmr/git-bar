@@ -25,7 +25,7 @@ class UpdateCaskTests(unittest.TestCase):
         app_contents = app_contents.replace(
             "APP_DESCRIPTION = Manage Git branches, worktrees, stashes, and pull requests",
             "APP_DESCRIPTION = Manage Git branches, worktrees, stashes, and pull requests // cask description",
-        ).replace("HOMEBREW_CASK_TOKEN = pedrotmr-git-bar", "HOMEBREW_CASK_TOKEN = pedrotmr-git-bar // cask file name")
+        ).replace("HOMEBREW_CASK_TOKEN = pedrotmr-git-bar", "HOMEBREW_CASK_TOKEN   =   pedrotmr-git-bar   // cask file name")
         app_contents = app_contents.replace("SPARKLE_ENABLED = YES", "SPARKLE_ENABLED = YES // optional update module")
         app_config.write_text(app_contents, encoding="utf-8")
         project_config = self.project_dir / "Config/Project.xcconfig"
@@ -90,6 +90,41 @@ class UpdateCaskTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Skipped old release 1.1.9", result.stdout)
         self.assertEqual(self.cask_path.read_text(), original)
+
+    def test_path_like_cask_token_is_rejected(self):
+        app_config = self.project_dir / "Config/App.xcconfig"
+        app_config.write_text(
+            app_config.read_text(encoding="utf-8").replace(
+                "HOMEBREW_CASK_TOKEN   =   pedrotmr-git-bar   // cask file name",
+                "HOMEBREW_CASK_TOKEN = ../invalid-token",
+            ),
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, str(self.script), "--print-cask-token"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("cask token", result.stderr)
+
+    def test_product_name_is_used_instead_of_executable_name(self):
+        app_config = self.project_dir / "Config/App.xcconfig"
+        app_config.write_text(
+            app_config.read_text(encoding="utf-8")
+            + "\nAPP_EXECUTABLE_NAME = LegacyExecutable\nPRODUCT_NAME = ReleaseProduct\n",
+            encoding="utf-8",
+        )
+
+        result = self.run_generator("1.2.0", "a" * 64)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        content = self.cask_path.read_text()
+        self.assertIn('app "ReleaseProduct.app"', content)
+        self.assertIn("ReleaseProduct-#{version}.zip", content)
+        self.assertNotIn("LegacyExecutable", content)
 
     def test_same_version_with_a_different_checksum_fails(self):
         self.assertEqual(self.run_generator("1.2.0", "a" * 64).returncode, 0)

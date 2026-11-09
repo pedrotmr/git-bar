@@ -5,12 +5,28 @@ struct PullRequestFetchResult {
     let errorMessage: String?
 }
 
+struct GitHubCLIErrorState {
+    private(set) var hasReportedError = false
+
+    mutating func message(for result: ShellResult) -> String? {
+        guard result.exitCode != 0 else {
+            hasReportedError = false
+            return nil
+        }
+        guard !hasReportedError else { return nil }
+
+        hasReportedError = true
+        let message = GitHubPullRequestService.actionableCLIMessage(for: result)
+        return "GitHub CLI: \(message.isEmpty ? "Command failed with exit code \(result.exitCode)." : message)"
+    }
+}
+
 @MainActor
 final class GitHubPullRequestService {
     private struct RepositoryContext {
         var ownerAndRepository: String?
         var username: String?
-        var hasReportedCLIError = false
+        var cliErrorState = GitHubCLIErrorState()
     }
 
     private struct GHUser: Decodable {
@@ -71,7 +87,7 @@ final class GitHubPullRequestService {
     }
 
     static func checkoutArguments(for pullRequest: PullRequest) -> [String] {
-        ["pr", "checkout", String(pullRequest.number)]
+        ["pr", "checkout", pullRequest.url]
     }
 
     static func actionableCLIMessage(for result: ShellResult) -> String {
@@ -114,7 +130,7 @@ final class GitHubPullRequestService {
                 at: repositoryPath
             )
             guard userResult.exitCode == 0 else {
-                let displayMessage = Self.reportableCLIError(for: userResult, context: &context)
+                let displayMessage = context.cliErrorState.message(for: userResult)
                 return (PullRequestFetchResult(pullRequests: [], errorMessage: displayMessage), context)
             }
 
@@ -123,7 +139,7 @@ final class GitHubPullRequestService {
                 return (PullRequestFetchResult(pullRequests: [], errorMessage: nil), context)
             }
             context.username = resolved
-            context.hasReportedCLIError = false
+            _ = context.cliErrorState.message(for: userResult)
             username = resolved
         }
 
@@ -153,9 +169,10 @@ final class GitHubPullRequestService {
 
         let (pullRequestOutput, reviewRequestOutput) = await (pullRequestResult, reviewRequestResult)
         guard pullRequestOutput.exitCode == 0 else {
-            let error = Self.reportableCLIError(for: pullRequestOutput, context: &context)
+            let error = context.cliErrorState.message(for: pullRequestOutput)
             return (PullRequestFetchResult(pullRequests: [], errorMessage: error), context)
         }
+        _ = context.cliErrorState.message(for: pullRequestOutput)
         guard let data = pullRequestOutput.stdout.data(using: .utf8) else {
             return (
                 PullRequestFetchResult(pullRequests: [], errorMessage: "GitHub CLI returned invalid PR output."),
@@ -199,16 +216,6 @@ final class GitHubPullRequestService {
         } catch {
             return ([], "Failed to parse team review requests: \(error.localizedDescription)")
         }
-    }
-
-    private static func reportableCLIError(
-        for result: ShellResult,
-        context: inout RepositoryContext
-    ) -> String? {
-        guard !context.hasReportedCLIError else { return nil }
-        let message = actionableCLIMessage(for: result)
-        context.hasReportedCLIError = true
-        return "GitHub CLI: \(message.isEmpty ? "Command failed with exit code \(result.exitCode)." : message)"
     }
 
     private static func categorize(
@@ -258,7 +265,7 @@ final class GitHubPullRequestService {
         } else {
             guard let components = URLComponents(string: remoteURL),
                   components.host?.caseInsensitiveCompare("github.com") == .orderedSame,
-                  ["https", "http", "ssh"].contains(components.scheme?.lowercased() ?? "")
+                  ["https", "http", "ssh", "git"].contains(components.scheme?.lowercased() ?? "")
             else { return nil }
             raw = String(components.path.dropFirst(components.path.hasPrefix("/") ? 1 : 0))
         }
