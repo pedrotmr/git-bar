@@ -13,9 +13,9 @@ struct RepoListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            BackHeader(title: "Repositories", action: { withAnimation { isShowing = false } }, trailing: AnyView(
-                IconButton(systemImage: "plus", tooltip: "Add repository") { addRepo() }
-            ))
+            BackHeader(title: "Repositories", action: { withAnimation { isShowing = false } }) {
+                IconButton(systemImage: "plus", tooltip: "Add repository", action: addRepo)
+            }
 
             Divider().opacity(0.5)
 
@@ -58,7 +58,6 @@ struct RepoListView: View {
                             )
                         }
 
-                        // Drop zone after last row — allows moving an item to the end
                         Color.clear
                             .frame(maxWidth: .infinity, minHeight: 20)
                             .contentShape(Rectangle())
@@ -96,7 +95,6 @@ struct RepoListView: View {
                     }
                     .padding(.vertical, 6)
                     .padding(.horizontal, 8)
-                    // Safety net: clear drag state if drop lands outside all drop targets
                     .onDrop(of: [.plainText], isTargeted: nil) { _ in
                         withAnimation(.easeInOut(duration: 0.15)) {
                             draggingPath = nil
@@ -107,7 +105,11 @@ struct RepoListView: View {
                     // Safety net: reset dim if drag is cancelled (Escape / drop outside window)
                     .task(id: draggingPath) {
                         guard draggingPath != nil else { return }
-                        try? await Task.sleep(for: .seconds(5))
+                        do {
+                            try await Task.sleep(for: .seconds(5))
+                        } catch {
+                            return
+                        }
                         withAnimation(.easeInOut(duration: 0.15)) { draggingPath = nil }
                     }
                 }
@@ -166,8 +168,6 @@ struct RepoListView: View {
     }
 }
 
-// MARK: - Repo Row
-
 private struct RepoRow: View {
     let path: String
     let isSelected: Bool
@@ -181,13 +181,7 @@ private struct RepoRow: View {
     let onDropExited: () -> Void
     @State private var isHovered = false
 
-    var repoName: String {
-        URL(fileURLWithPath: path).lastPathComponent
-    }
-
-    var shortPath: String {
-        path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
-    }
+    private var location: RepositoryLocation { RepositoryLocation(path: path) }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -201,11 +195,11 @@ private struct RepoRow: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(repoName)
+                Text(location.name)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                Text(shortPath)
+                Text(location.shortenedPath)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

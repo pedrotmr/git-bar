@@ -6,6 +6,7 @@ struct PullRequestRowView: View {
     @Environment(GitService.self) private var gitService
     @State private var isHovered = false
     @State private var copiedMessage: String? = nil
+    @State private var clearCopiedMessageTask: Task<Void, Never>?
 
     // 4 buttons × 22pt + 3 gaps × 2pt = 94pt — fixed so ZStack never shifts layout
     private let trailingWidth: CGFloat = 94
@@ -85,6 +86,11 @@ struct PullRequestRowView: View {
             Button("Copy URL") { copyWithFeedback(pr.url) }
             Button("Copy PR Number") { copyWithFeedback("#\(pr.number)") }
         }
+        .onDisappear {
+            clearCopiedMessageTask?.cancel()
+            clearCopiedMessageTask = nil
+            copiedMessage = nil
+        }
     }
 
     private func openInBrowser() {
@@ -96,8 +102,13 @@ struct PullRequestRowView: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(string, forType: .string)
         withAnimation { copiedMessage = "Copied!" }
-        Task {
-            try? await Task.sleep(for: .milliseconds(1500))
+        clearCopiedMessageTask?.cancel()
+        clearCopiedMessageTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .milliseconds(1500))
+            } catch {
+                return
+            }
             withAnimation { copiedMessage = nil }
         }
     }

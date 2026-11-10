@@ -1,6 +1,6 @@
 import Foundation
 
-struct Branch: Identifiable, Hashable {
+nonisolated struct Branch: Identifiable, Hashable, Sendable {
     var id: String { name }
     let name: String
     let isCurrent: Bool

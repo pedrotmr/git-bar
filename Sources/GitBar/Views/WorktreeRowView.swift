@@ -12,7 +12,6 @@ struct WorktreeRowView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            // Folder icon
             ZStack {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(Color.secondary.opacity(0.08))
@@ -22,7 +21,6 @@ struct WorktreeRowView: View {
                     .foregroundStyle(.secondary)
             }
 
-            // Info
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     Text(worktree.displayPath)
@@ -153,38 +151,14 @@ struct WorktreeRowView: View {
 
     private func openInTerminal() {
         let url = URL(fileURLWithPath: worktree.path)
-        let terminal = settingsService.preferredTerminal
-        guard let appURL = AppDetector.appURL(bundleIdentifier: terminal.rawValue) else {
-            NSWorkspace.shared.open(url)
-            return
-        }
-        if terminal == .cmux {
-            let cli = appURL.appendingPathComponent("Contents/Resources/bin/cmux")
-            let p = Process()
-            p.executableURL = cli
-            p.arguments = ["new-workspace", "--command", "cd '\(shellQuoted(worktree.path))' && exec $SHELL"]
-            try? p.run()
-        } else {
-            NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: .init(), completionHandler: nil)
-        }
-    }
-
-    private func shellQuoted(_ value: String) -> String {
-        value.replacingOccurrences(of: "'", with: "'\"'\"'")
+        WorktreeApplicationLauncher.openInTerminal(url, terminal: settingsService.preferredTerminal)
     }
 
     private func openInEditor() {
         let url = URL(fileURLWithPath: worktree.path)
-        let bundleId = settingsService.preferredEditor.rawValue
-        if let appURL = AppDetector.appURL(bundleIdentifier: bundleId) {
-            NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: .init(), completionHandler: nil)
-        } else {
-            NSWorkspace.shared.open(url)
-        }
+        WorktreeApplicationLauncher.openInEditor(url, editor: settingsService.preferredEditor)
     }
 }
-
-// MARK: - Badge
 
 struct Badge: View {
     let text: String

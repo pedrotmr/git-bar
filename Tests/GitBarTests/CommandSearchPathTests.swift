@@ -23,12 +23,73 @@ final class CommandSearchPathTests: XCTestCase {
         XCTAssertEqual(entries.last, "/custom/bin")
     }
 
-    func testFindsSystemGitAndLeavesMissingGitHubCLIActionable() throws {
+    func testFinderPathFindsGitAndGitHubServiceExplainsMissingCLI() async throws {
         let path = CommandSearchPath.augmentedPath(existingPath: nil, homeDirectory: "/Users/example")
 
         let gitPath = try XCTUnwrap(CommandSearchPath.executablePath(for: "git", path: path))
         XCTAssertTrue(FileManager.default.isExecutableFile(atPath: gitPath))
-        XCTAssertNil(CommandSearchPath.executablePath(for: "gh", path: "/empty"))
+
+        let missingCLI = await ShellExecutor.run(
+            "gh",
+            ["auth", "status"],
+            environmentOverrides: ["PATH": "/empty"]
+        )
+        XCTAssertEqual(missingCLI.exitCode, 127)
+        XCTAssertTrue(missingCLI.stderr.contains("Required command `gh` was not found"))
+
+        let actionableMessage = GitHubPullRequestService.actionableCLIMessage(for: missingCLI)
+        XCTAssertTrue(actionableMessage.contains("brew install gh"))
+        XCTAssertTrue(actionableMessage.contains("gh auth login"))
+    }
+
+    func testGitHubRepositoryParsingRequiresTheExactGitHubHost() {
+        XCTAssertEqual(
+            GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "https://github.com/owner/repo.git"),
+            "owner/repo"
+        )
+        XCTAssertEqual(
+            GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "git@github.com:owner/repo.git"),
+            "owner/repo"
+        )
+        XCTAssertEqual(
+            GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "git://github.com/owner/repo.git"),
+            "owner/repo"
+        )
+        XCTAssertNil(GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "https://evilgithub.com/owner/repo"))
+        XCTAssertNil(GitHubPullRequestService.parseGitHubOwnerAndRepository(from: "https://example.com/github.com/owner/repo"))
+    }
+
+    func testPullRequestCheckoutUsesGitHubCLIPullRequestCommand() {
+        let pullRequest = PullRequest(
+            number: 42,
+            title: "Fork contribution",
+            headRefName: "feature",
+            url: "https://github.com/owner/repo/pull/42",
+            category: .assigned
+        )
+
+        XCTAssertEqual(
+            GitHubPullRequestService.checkoutArguments(for: pullRequest),
+            ["pr", "checkout", "https://github.com/owner/repo/pull/42"]
+        )
+    }
+
+    func testPullRequestCLIErrorCanBeReportedAgainAfterARecovery() throws {
+        var state = GitHubCLIErrorState()
+        let failure = ShellResult(stdout: "", stderr: "permission denied", exitCode: 1)
+        let success = ShellResult(stdout: "[]", stderr: "", exitCode: 0)
+
+        XCTAssertTrue(try XCTUnwrap(state.message(for: failure)).contains("permission denied"))
+        XCTAssertNil(state.message(for: failure))
+        XCTAssertNil(state.message(for: success))
+        XCTAssertTrue(try XCTUnwrap(state.message(for: failure)).contains("permission denied"))
+    }
+
+    func testHomebrewUpdateCommandUsesConfiguredCaskToken() {
+        XCTAssertEqual(
+            UpdateService.homebrewUpdateCommand(caskToken: "custom-gitbar"),
+            "brew upgrade --cask pedrotmr/git-bar/custom-gitbar"
+        )
     }
 
     func testFindsAnExecutableInTheConfiguredPath() throws {

@@ -18,6 +18,14 @@ final class UpdateService {
     @ObservationIgnored private var automaticChecksObservation: NSKeyValueObservation?
     var availableUpdateVersion: String?
 
+    private var updater: SPUUpdater? {
+        managedByHomebrew ? homebrewUpdater : controller?.updater
+    }
+
+    static func homebrewUpdateCommand(caskToken: String) -> String {
+        "brew upgrade --cask pedrotmr/git-bar/\(caskToken)"
+    }
+
     init() {
         let bundle = Bundle.main
         let bundleIdentifier = bundle.bundleIdentifier ?? "com.GitBar.app"
@@ -33,9 +41,10 @@ final class UpdateService {
         self.updaterDelegate = updaterDelegate
 
         if managedByHomebrew {
+            let caskToken = bundle.object(forInfoDictionaryKey: "HOMEBREW_CASK_TOKEN") as? String ?? "pedrotmr-git-bar"
             let userDriver = HomebrewUserDriver(
                 appName: "GitBar",
-                updateCommand: "brew upgrade --cask pedrotmr/git-bar/pedrotmr-git-bar",
+                updateCommand: Self.homebrewUpdateCommand(caskToken: caskToken),
                 hostBundle: bundle,
                 delegate: userDriverDelegate
             )
@@ -77,18 +86,21 @@ final class UpdateService {
             return
         }
 
-        guard let updater = homebrewUpdater else { return }
-        if !hasStartedHomebrewUpdater {
-            do {
-                try updater.start()
-                hasStartedHomebrewUpdater = true
-            } catch {
-                homebrewUserDriver?.showUpdaterStartError(error)
-                return
-            }
-        }
-
+        guard let updater, startHomebrewUpdaterIfNeeded() else { return }
         updater.checkForUpdates()
+    }
+
+    private func startHomebrewUpdaterIfNeeded() -> Bool {
+        guard !hasStartedHomebrewUpdater else { return true }
+        guard let homebrewUpdater else { return false }
+        do {
+            try homebrewUpdater.start()
+            hasStartedHomebrewUpdater = true
+            return true
+        } catch {
+            homebrewUserDriver?.showUpdaterStartError(error)
+            return false
+        }
     }
 
     func installAvailableUpdate() {
@@ -96,16 +108,10 @@ final class UpdateService {
     }
 
     private func startBackgroundUpdateChecks() {
-        guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater else { return }
+        guard let updater else { return }
 
         if managedByHomebrew {
-            do {
-                try updater.start()
-                hasStartedHomebrewUpdater = true
-            } catch {
-                homebrewUserDriver?.showUpdaterStartError(error)
-                return
-            }
+            guard startHomebrewUpdaterIfNeeded() else { return }
         } else {
             controller?.startUpdater()
         }
@@ -134,7 +140,7 @@ final class UpdateService {
 
     private func scheduleNextBackgroundCheck(after error: Error?) {
         guard let backgroundCheckInterval else { return }
-        guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater,
+        guard let updater,
               let delay = probeSchedule.nextInterval(
                 after: error,
                 normalInterval: backgroundCheckInterval,
@@ -147,7 +153,7 @@ final class UpdateService {
     }
 
     private func scheduleBackgroundCheck(after delay: TimeInterval) {
-        guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater,
+        guard let updater,
               updater.automaticallyChecksForUpdates else {
             stopBackgroundCheckSchedule()
             return
@@ -165,7 +171,6 @@ final class UpdateService {
     }
 
     private func checkForUpdateInformation() {
-        let updater = managedByHomebrew ? homebrewUpdater : controller?.updater
         guard let updater else { return }
         guard updater.automaticallyChecksForUpdates else {
             stopBackgroundCheckSchedule()

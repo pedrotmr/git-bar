@@ -27,6 +27,12 @@ jobs:
           ref: main
           persist-credentials: false
 
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.release.tag_name }}
+          path: release-source
+          persist-credentials: false
+
       - name: Check stable release and download ZIP
         env:
           GH_TOKEN: ${{ github.token }}
@@ -38,7 +44,7 @@ jobs:
             echo "::error::Only vMAJOR.MINOR.PATCH releases can update Homebrew."
             exit 1
           fi
-          release_json=$(gh release view "$RELEASE_TAG" --repo "pedrotmr/git-bar" --json isDraft,isPrerelease)
+          release_json=$(gh release view "$RELEASE_TAG" --repo "$GH_REPO" --json isDraft,isPrerelease)
           if [[ "$(jq -r '.isDraft' <<< "$release_json")" != false || "$(jq -r '.isPrerelease' <<< "$release_json")" != false ]]; then
             echo "::error::Only published stable releases can update the Homebrew tap."
             exit 1
@@ -55,20 +61,20 @@ jobs:
             exit 1
           fi
           version=${RELEASE_TAG#v}
+          metadata=$(python3 scripts/update-cask.py --config-root release-source --fallback-config-root . --print-homebrew-settings)
+          app_name=$(jq -r '.app_name' <<< "$metadata")
+          echo "APP_NAME=$app_name" >> "$GITHUB_ENV"
+          echo "APP_DISPLAY_NAME=$(jq -r '.app_display_name' <<< "$metadata")" >> "$GITHUB_ENV"
+          echo "RELEASE_OWNER=$(jq -r '.owner' <<< "$metadata")" >> "$GITHUB_ENV"
+          echo "RELEASE_SLUG=$(jq -r '.slug' <<< "$metadata")" >> "$GITHUB_ENV"
+          echo "CASK_TOKEN=$(jq -r '.cask_token' <<< "$metadata")" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/release"
-          gh release download "$RELEASE_TAG" --repo "pedrotmr/git-bar" \
-            --pattern "GitBar-$version.zip" --dir "$RUNNER_TEMP/release"
-          {
-            echo "RELEASE_VERSION=$version"
-            echo "RELEASE_OWNER=$(sed -n 's/^RELEASE_OWNER = //p' Config/App.xcconfig)"
-            echo "RELEASE_SLUG=$(sed -n 's/^RELEASE_SLUG = //p' Config/App.xcconfig)"
-            echo "APP_BUNDLE_ID=$(sed -n 's/^PRODUCT_BUNDLE_IDENTIFIER = //p' Config/App.xcconfig)"
-            echo "APP_NAME=$(sed -n 's/^PRODUCT_NAME = //p' Config/App.xcconfig)"
-            echo "APP_MIN_SYSTEM_VERSION=$(sed -n 's/^MACOSX_DEPLOYMENT_TARGET = //p' Config/Project.xcconfig)"
-          } >> "$GITHUB_ENV"
+          gh release download "$RELEASE_TAG" --repo "$GH_REPO" \
+            --pattern "$app_name-$version.zip" --dir "$RUNNER_TEMP/release"
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Build Sparkle verification tools
-        run: make setup && make bundle
+        run: make -C release-source setup && make -C release-source bundle
 
       - name: Verify the signed release ZIP
         env:
@@ -76,8 +82,11 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          archive="$RUNNER_TEMP/release/GitBar-$RELEASE_VERSION.zip"
-          scripts/verify-release-zip.sh "$archive" "$RELEASE_TAG"
+          archive="$RUNNER_TEMP/release/$APP_NAME-$RELEASE_VERSION.zip"
+          (
+            cd release-source
+            scripts/verify-release-zip.sh "$archive" "$RELEASE_TAG"
+          )
           sha256=$(shasum -a 256 "$archive" | awk '{ print $1 }')
           echo "RELEASE_SHA256=$sha256" >> "$GITHUB_ENV"
 
@@ -101,32 +110,25 @@ jobs:
           export XDG_CONFIG_HOME="$trust_config"
           export HOMEBREW_NO_AUTO_UPDATE=1
           python3 scripts/update-cask.py \
+            --config-root release-source \
+            --fallback-config-root . \
             --tap-dir tap \
             --version "$VERSION" \
-            --sha256 "$SHA256" \
-            --owner "$RELEASE_OWNER" \
-            --slug "$RELEASE_SLUG" \
-            --cask-token "pedrotmr-git-bar" \
-            --bundle-id "$APP_BUNDLE_ID" \
-            --app-name "$APP_NAME" \
-            --app-display-name "GitBar" \
-            --description "Manage Git branches, worktrees, stashes, and pull requests" \
-            --min-macos "$APP_MIN_SYSTEM_VERSION" \
-            --sparkle "yes"
+            --sha256 "$SHA256"
           cd tap
-          tap_name="pedrotmr/git-bar"
+          tap_name="$RELEASE_OWNER/$RELEASE_SLUG"
           brew tap --custom-remote "$tap_name" "file://$PWD"
           tap_dir=$(brew --repository "$tap_name")
           mkdir -p "$tap_dir/Casks"
-          cp "Casks/pedrotmr-git-bar.rb" "$tap_dir/Casks/pedrotmr-git-bar.rb"
-          brew trust --cask "$tap_name/pedrotmr-git-bar"
-          brew style --cask "$tap_name/pedrotmr-git-bar"
-          brew audit --cask --strict --online "$tap_name/pedrotmr-git-bar"
+          cp "Casks/$CASK_TOKEN.rb" "$tap_dir/Casks/$CASK_TOKEN.rb"
+          brew trust --cask "$tap_name/$CASK_TOKEN"
+          brew style --cask "$tap_name/$CASK_TOKEN"
+          brew audit --cask --strict --online "$tap_name/$CASK_TOKEN"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "Casks/pedrotmr-git-bar.rb"
+          git add "Casks/$CASK_TOKEN.rb"
           if ! git diff --cached --quiet; then
-            git commit -m "Update GitBar to $VERSION"
+            git commit -m "Update $APP_DISPLAY_NAME to $VERSION"
             echo "updated=true" >> "$GITHUB_OUTPUT"
           fi
 

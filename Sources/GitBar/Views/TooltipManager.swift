@@ -1,8 +1,6 @@
 import AppKit
 import SwiftUI
 
-// MARK: - Tooltip content
-
 private struct TooltipContent: View {
     let text: String
 
@@ -19,8 +17,6 @@ private struct TooltipContent: View {
             .fixedSize()
     }
 }
-
-// MARK: - View modifier
 
 private struct CustomTooltip: ViewModifier {
     let text: String
@@ -52,8 +48,6 @@ extension View {
         modifier(CustomTooltip(text: text))
     }
 }
-
-// MARK: - Manager
 
 @MainActor
 final class TooltipManager {
